@@ -1,6 +1,6 @@
-# Wallet Attached Storage specification
+# Portable Web Spaces specification
 
-> Wallet Attached Storage is a general-purpose permissioned cloud storage API:
+> Portable Web Spaces is a general-purpose permissioned cloud storage API:
 > CRUD over an HTTP hierarchy of Spaces, Collections, and Resources, secured by
 > object-capability (zCap) authorization. Storage is private by default -- only
 > a Space's controller may act on it unless a policy grants otherwise -- and
@@ -11,7 +11,7 @@
 > extensions (linksets, policies, metadata, export, backends, query, quotas) are
 > each optional.
 
-This repository contains the Wallet Attached Storage specification (in [ReSpec 
+This repository contains the Portable Web Spaces specification (in [ReSpec 
 Markdown](https://respec.org/docs/#markdown) format)
 
 For LLM consumption, [`llms.txt`](llms.txt) summarizes the spec and links to its

@@ -1,12 +1,12 @@
-# Wallet Attached Storage (WAS)
+# Portable Web Spaces (PWS)
 
-> Wallet Attached Storage is a general-purpose permissioned cloud storage API: CRUD over an HTTP hierarchy of Spaces, Collections, and Resources, secured by object-capability (zCap) authorization. Storage is private by default -- only a Space's controller may act on it unless a policy grants otherwise -- and requests that are not authorized return "not found" rather than "not authorized", so the existence of a resource is never leaked. The specification is layered: a minimal conformant server implements only Resource CRUD plus the authorization profile, while listing, collection and space management, multi-tenancy, and extensions (linksets, policies, metadata, export, backends, query, quotas) are each optional.
+> Portable Web Spaces is a general-purpose permissioned cloud storage API: CRUD over an HTTP hierarchy of Spaces, Collections, and Resources, secured by object-capability (zCap) authorization. Storage is private by default -- only a Space's controller may act on it unless a policy grants otherwise -- and requests that are not authorized return "not found" rather than "not authorized", so the existence of a resource is never leaked. The specification is layered: a minimal conformant server implements only Resource CRUD plus the authorization profile, while listing, collection and space management, multi-tenancy, and extensions (linksets, policies, metadata, export, backends, query, quotas) are each optional.
 
 This is an experimental W3C CCG draft (v0.3), undergoing regular revisions. It is authored as a single Markdown file, `spec.md`, which is the authoritative full text. The rendered HTML below is a static, pre-rendered snapshot of that same document, so it can be fetched and read without executing JavaScript.
 
 ## Docs
 
-- [Specification, full text (Markdown source)](https://raw.githubusercontent.com/w3c-ccg/wallet-attached-storage-spec/main/spec.md): The entire normative specification -- data model, HTTP API, error registry, and the WAS Authorization Profile. Read this one if you want everything.
+- [Specification, full text (Markdown source)](https://raw.githubusercontent.com/w3c-ccg/wallet-attached-storage-spec/main/spec.md): The entire normative specification -- data model, HTTP API, error registry, and the PWS Authorization Profile. Read this one if you want everything.
 - [Specification, rendered](https://w3c-ccg.github.io/wallet-attached-storage-spec/): The same document as static HTML, with section numbering, cross-references, and a table of contents. Requires no JavaScript.
 - [Specification, full text (Markdown source, published)](https://w3c-ccg.github.io/wallet-attached-storage-spec/spec.md): The Markdown source, served from the same origin as the rendered page.
 

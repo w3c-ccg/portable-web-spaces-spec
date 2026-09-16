@@ -1,8 +1,8 @@
 <div class="remove">
 
-# Wallet Attached Storage v0.5
+# Portable Web Spaces v0.5
 
-**Abstract:** Wallet Attached Storage is a general purpose permissioned
+**Abstract:** Portable Web Spaces is a general purpose permissioned
 storage API -- CRUD over an HTTP hierarchy with object-capability authorization.
 
 **Status:** Experimental W3C CCG draft, undergoing regular revisions.
@@ -12,25 +12,25 @@ Rendered version: https://w3c-ccg.github.io/wallet-attached-storage-spec/
 
 ## Introduction {#introduction}
 
-The Wallet Attached Storage (WAS) specification brings together the lessons
+The Portable Web Spaces (PWS) specification brings together the lessons
 learned from many attempts to standardize permissioned cloud storage over
 the years.
 
 This specification aims to provide:
 
-* A set of **design constraints, goals, and requirements** for WAS, see **Appendix
+* A set of **design constraints, goals, and requirements** for PWS, see **Appendix
   [[[#goals-and-requirements]]]**.
 * A tiered composable **data model** for storage primitives
 * An **HTTP API** binding for storage operations (other bindings, such as JSON-RPC
   or CBOR-based RPCs, are left for future work).
 * An authorization profile for use with this storage, see
-  [[[#was-authorization-profile-v0-1]]].
+  [[[#pws-authorization-profile-v0-1]]].
 
 <div class="note">
 This document is deliberately comprehensive: it specifies both a small required
 core and a set of optional extensions. A conformant minimal server implements
 only Resource CRUD ([[[#resources-and-blobs]]]) and the authorization profile
-([[[#was-authorization-profile-v0-1]]]); every other endpoint group is OPTIONAL.
+([[[#pws-authorization-profile-v0-1]]]); every other endpoint group is OPTIONAL.
 See [[[#scope-and-conformance-profiles]]] for the full conformance-tier map, and
 [[[#quickstart-your-first-request]]] to watch a first request succeed.
 </div>
@@ -51,7 +51,8 @@ This subsection is non-normative.
   Community Group (CCG)'s Capability Based Storage Task Force for further
   incubation. Goal: updating spec to match deployments and learnings.
 * **v0.5** (September 2026 - now) -- Breaking changes, refactoring, community
-  input. Likely pending a rename. Breaking changes so far:
+  input. Renamed from Wallet Attached Storage to Portable Web Spaces.
+  Breaking changes so far:
   * The description of a container moved to its `meta` sub-resource at every
     level, and a Collection's description merged with its Metadata object.
     `GET`/`PUT` at `/space/{space_id}/meta` read and write the
@@ -95,10 +96,10 @@ This subsection is non-normative.
     writes and key-epoch stamping are now baseline server requirements rather
     than backend-advertised affordances. `changes-query` is now advertised
     server-wide in the service description's `features` array rather than per
-    backend. WAS-EC's optional affordances (`blinded-index-query` and
+    backend. PWS-EC's optional affordances (`blinded-index-query` and
     `governed-history-logs`) are now tokens of its own version entry rather
     than backend features, and serving the chunk endpoints is now a plain
-    requirement of WAS-EC conformance rather than a token at all.
+    requirement of PWS-EC conformance rather than a token at all.
 
 No stored data moves across the v0.4-to-v0.5 path changes. The durable
 artifacts to audit are capabilities. A delegated capability whose
@@ -117,7 +118,7 @@ document relies on, so that a section read in isolation is still intelligible.
 
 **`Authorization: ...` is a placeholder.** Every request example that carries an
 `Authorization` header abbreviates a signed [=zCap=] (capability) invocation
-(as opposed to a bearer token). Reads are authorized in WAS just as writes are.
+(as opposed to a bearer token). Reads are authorized in PWS just as writes are.
 The expanded form -- with the `Digest`, `Capability-Invocation`, and `Signature`
 headers -- appears once, in [[[#performing-authorized-api-calls]]].
 
@@ -152,7 +153,7 @@ carries (see [[[#service-description]]]).
 **Paths are relative to a server root, which may be a subpath.** Every path in
 this document, `/space/{space_id}/...` and `/spaces/`, is written from the
 [=server=]'s root. That root is not necessarily an origin: a server MAY be
-mounted under a path such as `https://example.com/was/`. A client cannot
+mounted under a path such as `https://example.com/pws/`. A client cannot
 derive the root from a URL it holds, which is why the service description is
 linked rather than placed at a fixed path, and why every URL the service
 description carries is absolute.
@@ -195,11 +196,11 @@ Repositories, Spaces, Collections, then Resources), which is convenient as a
 reference but is the reverse of the tiers. If you're new to the spec, scan the
 profile table below for the conformance tiers, then walk through
 [[[#quickstart-your-first-request]]] to watch a request succeed. The core tier
-is just [[[#resources-and-blobs]]] plus [[[#was-authorization-profile-v0-1]]].
+is just [[[#resources-and-blobs]]] plus [[[#pws-authorization-profile-v0-1]]].
 
 | Profile               | Adds                                                                                             | Defining sections                                                                                     | Advertised as (see [[[#service-description-data-model]]]) |
 |-----------------------|--------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------|-----------------------------------------------------------|
-| **Minimal**           | Resource CRUD (KV + blob read/write) + authorization + the service description                   | [[[#resources-and-blobs]]], [[[#was-authorization-profile-v0-1]]], [[[#service-description]]]         | the version entry itself                                  |
+| **Minimal**           | Resource CRUD (KV + blob read/write) + authorization + the service description                   | [[[#resources-and-blobs]]], [[[#pws-authorization-profile-v0-1]]], [[[#service-description]]]         | the version entry itself                                  |
 | **+ Listing**         | list resources / collections / spaces                                                            | [[[#list-collection-operation]]], [[[#list-all-collections-operation]]], [[[#list-spaces-operation]]] | `listing`                                                 |
 | **+ Collection mgmt** | create / manage collections in a Space                                                           | [[[#collections]]]                                                                                    | `collection-management`                                   |
 | **+ Space mgmt**      | manage an individual Space                                                                       | [[[#read-space-operation]]] (Space endpoints)                                                         | `space-management`                                        |
@@ -274,12 +275,12 @@ Content-type: application/json
 ```
 
 (The `Authorization: ...` placeholder stands for a signed zCap invocation).
-WAS reads are authorized too, so the header is required on the
+PWS reads are authorized too, so the header is required on the
 `GET` just as on the `PUT`. How that invocation is constructed is defined in
 [[[#performing-authorized-api-calls]]], and its fully expanded form -- with the
 `Digest`, `Capability-Invocation`, and `Signature` headers spelled out -- is
 shown once in the worked example within that section. Producing that signature
-requires a conformant WAS client: it is an Ed25519 `did:key` capability
+requires a conformant PWS client: it is an Ed25519 `did:key` capability
 invocation, not something you can hand-write with curl.
 
 To go beyond a single pre-existing Space -- to create your own Space, or
@@ -346,7 +347,7 @@ implicit, controlled by the server.
 * `DELETE /space/{space_id}/{collection_id}/` -- [[[#delete-collection-operation]]]
 * `GET|PUT /space/{space_id}/{collection_id}/meta/log` --
   [[[#collection-governing-history-log]]] (available only on a server whose
-  WAS-EC version entry advertises `governed-history-logs`; see
+  PWS-EC version entry advertises `governed-history-logs`; see
   [[[#service-description-data-model]]])
 
 **Spaces Repository Endpoints -- Manage Spaces on a Server:**
@@ -374,8 +375,8 @@ pre-configured and controlled by the server.
 * `PUT /space/{space_id}/{collection_id}/{resource_id}/meta` -- [[[#update-resource-metadata-operation]]]
 
 **Chunked Resource Endpoints** (see [[[#chunked-resources]]]; serving them is a
-requirement of [[WAS-EC]] conformance, so a server that does not implement
-[[WAS-EC]] MAY omit them entirely):
+requirement of [[PWS-EC]] conformance, so a server that does not implement
+[[PWS-EC]] MAY omit them entirely):
 
 * `PUT|GET|HEAD|DELETE /space/{space_id}/{collection_id}/{resource_id}/chunks/{index}`
   -- store, read, head, delete a single chunk.
@@ -427,7 +428,7 @@ Required if Space endpoints or Collection endpoints are supported.
 <dl class="termlist definitions" data-sort="ascending">
   <dt><dfn data-lt="action|actions|allowedAction">action (allowedAction)</dfn></dt>
   <dd>The kind of operation a request performs on a target, named by a capability
-    so it can be authorized. WAS uses the uppercase HTTP method names
+    so it can be authorized. PWS uses the uppercase HTTP method names
     (<a>GET</a>, <a>POST</a>, <a>PUT</a>, <a>DELETE</a>) as its action
     vocabulary. See section
     [[[#authorization-actions-and-the-root-capability]]].</dd>
@@ -446,8 +447,8 @@ Required if Space endpoints or Collection endpoints are supported.
     non-negative integer index under the Resource's reserved <code>chunks</code>
     sub-path. The [=server=] stores a chunk exactly like a binary Resource
     representation and never parses it; framing and reassembly are the client's
-    concern. Serving chunks is a requirement of [[WAS-EC]] conformance; a
-    server that does not implement [[WAS-EC]] MAY omit the chunk endpoints.
+    concern. Serving chunks is a requirement of [[PWS-EC]] conformance; a
+    server that does not implement [[PWS-EC]] MAY omit the chunk endpoints.
     See section [[[#chunked-resources]]].</dd>
 
   <dt><dfn data-lt="collections">collection</dfn></dt>
@@ -563,13 +564,13 @@ operations requires an authorization system that is:
   (read, write, delete, etc)
 
 As the state of the art in cross-domain authorization advances, we expect there
-to be multiple profiles and specs that could be used to perform WAS API
+to be multiple profiles and specs that could be used to perform PWS API
 calls. However, to start with, this specification will focus on a single minimal
 authorization profile.
 
-### WAS Authorization Profile v0.1 {#was-authorization-profile-v0-1}
+### PWS Authorization Profile v0.1 {#pws-authorization-profile-v0-1}
 
-Like many authorization specifications, the WAS Authorization Profile tries
+Like many authorization specifications, the PWS Authorization Profile tries
 to address opposing tensions. On the one hand, to cover the full range of use
 cases, it needs to be delegatable, revocable, secure, flexible, and thus
  capability-based. On the other hand, for ease of implementation and adoption,
@@ -582,7 +583,7 @@ To that end, the profile offers the following layered mechanisms.
    DID directly to sign API calls with HTTP Signatures.
 2. **Public Read**: For the common "public read" use case (the typical web
    publishing workflow, where a site or a file is shared for anyone to access
-   via an HTTP GET), use the simple `{ "type": "PublicCanRead" }` WAS
+   via an HTTP GET), use the simple `{ "type": "PublicCanRead" }` PWS
    Authorization syntax, see below.
 3. **Advanced Delegatable Capabilities** ("anyone with the link..." style):
    Use zCaps [Authorization Capabilities v0.3](https://w3c-ccg.github.io/zcap-spec/)
@@ -592,7 +593,7 @@ To that end, the profile offers the following layered mechanisms.
 
 #### Authorization Specification Dependencies at a Glance {#authorization-specification-dependencies-at-a-glance}
 
-The initial WAS Authorization Profile uses the following specifications.
+The initial PWS Authorization Profile uses the following specifications.
 
 1. Identity (for controllers or clients/agents): [DID 1.0](https://www.w3.org/TR/did-1.0/)
 2. Capability data model: [Authorization Capabilities for Linked Data v0.3](https://w3c-ccg.github.io/zcap-spec/)
@@ -638,7 +639,7 @@ all the way to the space controller, by one of the following:
 
 Space `controller`s MUST be in the form of a [DID](https://www.w3.org/TR/did-1.0/).
 
-For minimal compatibility, all WAS implementations MUST support the
+For minimal compatibility, all PWS implementations MUST support the
 [`did:key` DID Method](https://w3c-ccg.github.io/did-key-spec/), using the
 Multikey encoding of `Ed25519` elliptic curve keys, as specified in the
 [Multikey section of the CID spec](https://www.w3.org/TR/cid-1.0/#Multikey)
@@ -708,7 +709,7 @@ determination and verification.
 #### Performing Authorized API Calls {#performing-authorized-api-calls}
 
 Unless otherwise explicitly allowed via access control policy (see below),
-all WAS API calls require authorization.
+all PWS API calls require authorization.
 
 This can be done in one of two ways:
 
@@ -776,7 +777,7 @@ Authorization: Signature keyId="did:key:z6MkpBMbMaRSv5nsgifRAwEKvHHoiKDMhiAHShTF
 **Digest vs Content-Digest.** The `Digest` header used by this profile
 descends from [[RFC3230]] (Instance Digests in HTTP). [[RFC9530]] (Digest
 Fields) obsoletes RFC 3230 and replaces `Digest` with `Content-Digest` /
-`Repr-Digest`. The current WAS implementation stack uses the legacy header
+`Repr-Digest`. The current PWS implementation stack uses the legacy header
 with a multihash value; migration to `Content-Digest` (alongside the move to
 [[RFC9421]] HTTP Message Signatures, see
 [[[#authorization-specification-dependencies-at-a-glance]]]) is a future
@@ -786,7 +787,7 @@ direction for this profile.
 #### Authorization Actions and the Root Capability {#authorization-actions-and-the-root-capability}
 
 A capability invocation names an [=action=] that the invoked capability must
-permit. WAS uses the uppercase HTTP method names as its action vocabulary:
+permit. PWS uses the uppercase HTTP method names as its action vocabulary:
 
 * <dfn id="get-action">`GET`</dfn> -- read a Space, Collection, or Resource. A
   `HEAD` request is authorized as a `GET`.
@@ -913,7 +914,7 @@ by `POST`.
 <div class="ednote">
 **Revocation.** This specification does not yet define a revocation
 operation, although its goals require that a grant can be withdrawn before it
-expires. The current WAS implementation stack ships a Space-scoped revocation
+expires. The current PWS implementation stack ships a Space-scoped revocation
 endpoint (`POST /space/{space_id}/zcaps/revocations/{revocation_id}`; every
 Space-rooted capability verification checks the presented delegation chain
 against the recorded revocations). A future revision will specify the
@@ -943,7 +944,7 @@ Content-type: application/linkset+json
   "linkset": [
     {
       "anchor": "/space/81246131-69a4-45ab-9bff-9c946b59cf2e/",
-      "https://wallet.storage/spec#policy": [
+      "https://w3id.org/pws#policy": [
         {
           "href": "/space/81246131-69a4-45ab-9bff-9c946b59cf2e/policy",
           "type": "application/json"
@@ -1071,7 +1072,7 @@ responses.
 
 ### Caching
 
-WAS relies on ordinary [[RFC9111]] HTTP caching and defines no caching layer of
+PWS relies on ordinary [[RFC9111]] HTTP caching and defines no caching layer of
 its own. On the read side, a Resource's strong `ETag` validator (see
 [[[#conditional-requests]]]) drives standard validation: a `GET` carrying
 `If-None-Match: "<etag>"` yields `304 Not Modified` when the Resource is
@@ -1211,7 +1212,7 @@ this specification may add members to it but MUST NOT rename, remove, or
 change the type of a member defined here.
 
 The service description has no fixed path. A [=server=] MAY be mounted under
-any path of an origin, and a client that holds a WAS URL cannot derive the
+any path of an origin, and a client that holds a PWS URL cannot derive the
 server root from it, so the document is found by following a link rather than
 by convention (see [[[#discovering-the-service-description]]]). This is the
 deliberate exception to the "description lives at `meta`" convention of
@@ -1229,7 +1230,7 @@ server-wide, so it reveals nothing about the existence of any Space, Collection,
 or Resource.
 
 ```http
-Link: <https://example.com/was/service>; rel="service"
+Link: <https://example.com/pws/service>; rel="service"
 ```
 
 The `service` relation is chosen over the `service-desc` and `service-doc`
@@ -1246,7 +1247,7 @@ CORS requirements apply:
   `Access-Control-Allow-Origin: *`, since it is fetched anonymously and
   cross-origin.
 
-The discovery flow is therefore two requests from any WAS URL a client has
+The discovery flow is therefore two requests from any PWS URL a client has
 come across (a link to a shared Resource, a public Collection, a service
 endpoint in a DID document):
 
@@ -1345,7 +1346,7 @@ specification does not enumerate them.
   `eddsa-jcs-2022`.
 
 <div class="ednote">
-The authorization profile ([[[#was-authorization-profile-v0-1]]]) does not yet
+The authorization profile ([[[#pws-authorization-profile-v0-1]]]) does not yet
 catalogue which values of these two members it requires; the examples below
 use the values the reference implementations exchange today.
 </div>
@@ -1399,7 +1400,7 @@ re-checking a host pays a revalidation rather than a fetch.
 Example discovery from a Resource URL the client holds:
 
 ```http
-HEAD /was/space/81246131-69a4-45ab-9bff-9c946b59cf2e/messages/hello-world HTTP/1.1
+HEAD /pws/space/81246131-69a4-45ab-9bff-9c946b59cf2e/messages/hello-world HTTP/1.1
 Host: example.com
 ```
 
@@ -1408,14 +1409,14 @@ the `Link` header is present regardless):
 
 ```http
 HTTP/1.1 404 Not Found
-Link: <https://example.com/was/service>; rel="service"
+Link: <https://example.com/pws/service>; rel="service"
 Access-Control-Expose-Headers: Link
 ```
 
 Example service description request and response:
 
 ```http
-GET /was/service HTTP/1.1
+GET /pws/service HTTP/1.1
 Host: example.com
 Accept: application/json
 ```
@@ -1429,16 +1430,16 @@ Access-Control-Allow-Origin: *
 Access-Control-Expose-Headers: Link
 Cache-Control: public, max-age=3600
 ETag: "a1b2c3"
-Link: <https://example.com/was/service>; rel="service"
+Link: <https://example.com/pws/service>; rel="service"
 
 {
-  "url": "https://example.com/was/service",
+  "url": "https://example.com/pws/service",
   "specs": {
     "https://w3id.org/pws": [
       {
         "version": "0.5",
         "url": "https://w3c-ccg.github.io/wallet-attached-storage-spec/v0.5/",
-        "spaces": "https://example.com/was/spaces/",
+        "spaces": "https://example.com/pws/spaces/",
         "features": ["listing", "collection-management", "space-management",
                      "linksets", "policy", "backends", "quotas"],
         "signatureAlgorithms": ["EdDSA"],
@@ -1447,7 +1448,7 @@ Link: <https://example.com/was/service>; rel="service"
       {
         "version": "0.4",
         "url": "https://w3c-ccg.github.io/wallet-attached-storage-spec/v0.4/",
-        "spaces": "https://example.com/was/spaces/",
+        "spaces": "https://example.com/pws/spaces/",
         "features": ["listing", "collection-management", "space-management",
                      "linksets", "policy", "backends", "quotas"]
       }
@@ -1504,7 +1505,7 @@ new version is advertised as a new [=version entry=]. A server MAY list the old
 and the new version together during a transition, and a client picks the
 newest it understands.
 
-Versions never appear in URL paths. A WAS URL is a capability target and a
+Versions never appear in URL paths. A PWS URL is a capability target and a
 long-lived identity: it is what a delegation chain is rooted on and what a
 client stores to find a Resource again. A version segment in the path would
 bind every delegation chain to a protocol version and would turn every version
@@ -2199,7 +2200,7 @@ Writable properties:
 * `encryption` (optional) - A non-secret descriptor declaring that this collection's
   Resources are client-side encrypted, and naming the scheme. The value is an
   object with a required string `scheme` and an optional positive-integer
-  `version` (e.g. `{ "scheme": "edv", "version": 1 }` for the EDV-over-WAS
+  `version` (e.g. `{ "scheme": "edv", "version": 1 }` for the EDV-over-PWS
   scheme); an absent `version` means `1`, and an absent descriptor means the
   collection is a <dfn id="plaintext-collection"
   data-lt="plaintext|plaintext collections">plaintext collection</dfn> -- its
@@ -2249,12 +2250,12 @@ Writable properties:
   enforces a small set of server-side invariants on the epoch members
   (`epochs` is append-only, `currentEpoch` never moves backwards), holds the
   `hmac` member permanent once present, and interprets nothing else.
-  Client-side profiles built on epochs (such as [[WAS-EC]]) require the epoch
+  Client-side profiles built on epochs (such as [[PWS-EC]]) require the epoch
   members from the descriptor's creation onward; the server-side optionality
   here exists because key management is out of this specification's scope, and
   is not a license for such a profile's clients to operate an epoch-less
   descriptor.
-  On a server whose WAS-EC version entry advertises `governed-history-logs`
+  On a server whose PWS-EC version entry advertises `governed-history-logs`
   (see [[[#service-description-data-model]]]), the descriptor MAY instead
   be governed by the Collection's history log: the server then derives it from
   the log's head entry, stamps a `history` member on the served value, and
@@ -2374,7 +2375,7 @@ scheme, validated structurally on write (rejecting a plaintext `custom` with an
 other member of this object stays plaintext. This is what gives an encrypted
 Collection a client-encrypted display name and tags, and a discoverable,
 conditionally-writable home for profile-level configuration such as the
-[[WAS-EC]] blinded-index schema. On an encrypted Collection a present `custom`
+[[PWS-EC]] blinded-index schema. On an encrypted Collection a present `custom`
 MUST be either a conforming envelope or an empty object; an empty object clears
 the stored annotations. Omitting `custom` clears them too, exactly as on a
 plaintext Collection, because a `PUT` of this object is a full replacement.
@@ -2900,11 +2901,11 @@ every reader. Which members a log governs, what an entry is beyond its
 `state`, and how a reader verifies the log are defined by a **governing
 profile**, not by this specification. The `encryption` descriptor of the
 [[[#collection-metadata-data-model]]] is the first governed member, under the
-resource log profile of [[WAS-EC]]; see
+resource log profile of [[PWS-EC]]; see
 [[[#governed-encryption-descriptor]]].
 
 Support is OPTIONAL and discoverable. A server that implements the
-sub-resource advertises `governed-history-logs` in its WAS-EC version entry's
+sub-resource advertises `governed-history-logs` in its PWS-EC version entry's
 `features` array (see [[[#service-description-data-model]]]). A server without
 the affordance serves a client-written member instead, so a producer MUST
 consult the token before choosing which form to write. A [=server=] that does
@@ -2963,7 +2964,7 @@ JSON object, a line without an object `state`, or a blank line other than the
 trailing line feed. A server MUST NOT require anything else of a line.
 Proofs, hash chaining, the `type` of a `state`, and any member name reserved
 inside `state` are defined by the governing profile (for the resource log
-format, [[WAS-EC]]) and are not checked here. The server stores the log; it
+format, [[PWS-EC]]) and are not checked here. The server stores the log; it
 does not verify it.
 
 #### Declaration and the derived member {#governing-log-declaration}
@@ -3011,7 +3012,7 @@ entry proofs nor the chain. A verifying reader reads the log, verifies it
 under the governing profile, and compares the derived member to the verified
 head's `state` after stripping `history`. A derived member that differs is a
 stale projection, and the reader acts on the verified head instead (for the
-resource log format, the equality check of [[WAS-EC]]).
+resource log format, the equality check of [[PWS-EC]]).
 
 #### Versioning {#governing-log-versioning}
 
@@ -3035,7 +3036,7 @@ Collection is an encrypted Collection from the declaration onward: the
 envelope rule applies to its Resources and its Metadata object, and the
 `plaintext` member is excluded, exactly as when the descriptor is written on
 the Metadata object. The profile's `state` carries a `type` member naming its
-schema ([[WAS-EC]]); the server stores it with the rest of the state and
+schema ([[PWS-EC]]); the server stores it with the rest of the state and
 does not interpret it.
 
 On every log write the server runs, on the head `state`, the same checks the
@@ -3462,7 +3463,7 @@ HTTP/1.1 204 No Content
 Example request (uploading a binary Blob via PUT; the bytes are stored
 verbatim under the supplied content type, see
 [[[#content-types-and-representations]]]). The `Digest` header binds the
-body to the request signature when using the WAS Authorization Profile (see
+body to the request signature when using the PWS Authorization Profile (see
 [[[#request-body-integrity-digest-header]]]):
 
 ```http
@@ -3861,8 +3862,8 @@ Errors (see [[[#error-type-registry]]] for canonical examples):
 
 <div class="note">
 Chunked Resources are an OPTIONAL feature. Serving the chunk endpoints is a
-requirement of [[WAS-EC]] conformance; a server that does not implement
-[[WAS-EC]] MAY omit these endpoints entirely and remain conformant; see
+requirement of [[PWS-EC]] conformance; a server that does not implement
+[[PWS-EC]] MAY omit these endpoints entirely and remain conformant; see
 [[[#scope-and-conformance-profiles]]].
 </div>
 
@@ -3878,7 +3879,7 @@ server never concatenates a Resource's chunks, and reading the parent Resource's
 own content (see [[[#read-resource-operation]]]) returns only that content, not
 its chunks; the chunk set is discovered and read through the endpoints below.
 
-Chunks are the substrate the [[[#edv-over-was-profile-v0-1]]] uses to store a
+Chunks are the substrate the [[[#edv-over-pws-profile-v0-1]]] uses to store a
 large or streamed encrypted document, but the mechanism itself is
 scheme-agnostic: the bytes of a chunk are opaque to the server whether they are
 plaintext, ciphertext, or anything else.
@@ -4141,7 +4142,7 @@ this specification (see [[[#authorization]]]): writes (`PUT`, `DELETE`) are
 capability-only, while reads (`GET`, `HEAD`, and the container listing) are
 capability-or-policy. A chunk write's capability `invocationTarget` MUST be the
 chunk's own full URL (member form), and the listing's the `chunks/` container
-URL -- the same exact-match target rule that governs every WAS URL (see
+URL -- the same exact-match target rule that governs every PWS URL (see
 [=target=]). For a read, the governing access-control [=policy=] is the parent
 Resource's: a chunk exposes a fragment of the same content the Resource holds, so
 whoever may read the Resource may read its chunks, and the maximum-privacy
@@ -4171,14 +4172,14 @@ located at `/space/{space_id}/linkset` contains a set of links to auxiliary
 resources and extension points:
 
 * <dfn data-lt="policy relation" id="policy-rel"><code>policy</code> relation</dfn>
-  (`https://wallet.storage/spec#policy`) - A link to the
+  (`https://w3id.org/pws#policy`) - A link to the
   `/space/{space_id}/policy` resource, which contains a set of links to access
   control policy documents.
 * <dfn id="backends-available">`backends-available`</dfn>
-  (`https://wallet.storage/spec#backends-available`) - A link to the
+  (`https://w3id.org/pws#backends-available`) - A link to the
   `/space/{space_id}/backends` "Backends Available" resource.
 * <dfn data-lt="quotas relation" id="quotas-rel"><code>quotas</code> relation</dfn>
-  (`https://wallet.storage/spec#quotas`) -
+  (`https://w3id.org/pws#quotas`) -
   A link to the `/space/{space_id}/quotas` per-backend storage [=quota=] report
   (see [[[#quotas]]]).
 * `service` relation ([[RFC5023]]) - A link to the [=service description=]
@@ -4203,19 +4204,19 @@ Content-type: application/linkset+json
   "linkset": [
     {
       "anchor": "/space/81246131-69a4-45ab-9bff-9c946b59cf2e/",
-      "https://wallet.storage/spec#policy": [
+      "https://w3id.org/pws#policy": [
         {
           "href": "/space/81246131-69a4-45ab-9bff-9c946b59cf2e/policy",
           "type": "application/json"
         }
       ],
-      "https://wallet.storage/spec#backends-available": [
+      "https://w3id.org/pws#backends-available": [
         {
           "href": "/space/81246131-69a4-45ab-9bff-9c946b59cf2e/backends",
           "type": "application/json"
         }
       ],
-      "https://wallet.storage/spec#quotas": [
+      "https://w3id.org/pws#quotas": [
         {
           "href": "/space/81246131-69a4-45ab-9bff-9c946b59cf2e/quotas",
           "type": "application/json"
@@ -4238,15 +4239,15 @@ The collection `linkset` resource (one of the [[[#collection-level-reserved-endp
 located at `/space/{space_id}/{collection_id}/linkset` contains a set of links
 to auxiliary resources and extension points:
 
-* The [=policy relation=] (`https://wallet.storage/spec#policy`) - A link to the
+* The [=policy relation=] (`https://w3id.org/pws#policy`) - A link to the
   `/space/{space_id}/{collection_id}/policy` resource, which contains a set of links
   to access control policy documents.
 * <dfn data-lt="backend relation" id="backend-rel"><code>backend</code> relation</dfn>
-  (`https://wallet.storage/spec#backend`) - A link to the
+  (`https://w3id.org/pws#backend`) - A link to the
   detailed `/space/{space_id}/{collection_id}/backend` "Backend Selected for this
   collection" resource.
 * <dfn data-lt="quota relation" id="quota-rel"><code>quota</code> relation</dfn>
-  (`https://wallet.storage/spec#quota`) - A
+  (`https://w3id.org/pws#quota`) - A
   link to the `/space/{space_id}/{collection_id}/quota` storage [=quota=] report
   for this collection (see [[[#quotas]]]).
 * `service` relation ([[RFC5023]]) - A link to the [=service description=]
@@ -4273,19 +4274,19 @@ Content-type: application/linkset+json
   "linkset": [
     {
       "anchor": "/space/81246131-69a4-45ab-9bff-9c946b59cf2e/messages/",
-      "https://wallet.storage/spec#policy": [
+      "https://w3id.org/pws#policy": [
         {
           "href": "/space/81246131-69a4-45ab-9bff-9c946b59cf2e/messages/policy",
           "type": "application/json"
         }
       ],
-      "https://wallet.storage/spec#backend": [
+      "https://w3id.org/pws#backend": [
         {
           "href": "/space/81246131-69a4-45ab-9bff-9c946b59cf2e/messages/backend",
           "type": "application/json"
         }
       ],
-      "https://wallet.storage/spec#quota": [
+      "https://w3id.org/pws#quota": [
         {
           "href": "/space/81246131-69a4-45ab-9bff-9c946b59cf2e/messages/quota",
           "type": "application/json"
@@ -4499,7 +4500,7 @@ Each entry in the `backends` array carries:
 * `constraints` (optional) - operational constraints such as
   `maxUploadBytes`, the largest single upload the backend accepts.
 * `restrictedActions` - an array of [=actions=] (uppercase HTTP verbs, the
-  same vocabulary as the WAS Authorization Profile, see
+  same vocabulary as the PWS Authorization Profile, see
   [[[#authorization-actions-and-the-root-capability]]]) currently unavailable
   on this backend. For example, a full backend reports `["POST", "PUT"]`
   while still permitting reads and deletes.
@@ -4739,7 +4740,7 @@ it rewrite the Space's root of trust.
 
 #### Self-hosted histories {#self-hosted-histories}
 
-The history of a verified-log controller MAY be stored on the WAS server
+The history of a verified-log controller MAY be stored on the PWS server
 itself, as one or more Resources in a Collection of a Space on that server.
 The method's standard DID-to-URL transformation then lands on
 `/space/{space_id}/{collection_id}/` followed by the method's history file
@@ -4763,7 +4764,7 @@ method.
 Hosting a history under a Space's path is not an endorsement by that Space's
 controller: any party holding a write grant there can store a resolvable
 history. A verified-log DID is self-certifying through its own identifier and
-history. It acquires authority in WAS only by being referenced, as a Space's
+history. It acquires authority in PWS only by being referenced, as a Space's
 stored `controller` or as the `controller` of a delegated capability, and not
 by where its history is stored.
 
@@ -4790,7 +4791,7 @@ History layout. The history is the method's `did.jsonl` log. Self-hosted,
 the DID `did:webvh:{scid}:{host}:space:{space_id}:{collection_id}` resolves
 from the Resource at `https://{host}/space/{space_id}/{collection_id}/did.jsonl`
 under the method's standard DID-to-HTTPS transformation. The `{collection_id}`
-is any Collection id; WAS Collection ids are restricted to characters the
+is any Collection id; PWS Collection ids are restricted to characters the
 method's path encoding leaves untouched, so the mapping is direct.
 
 Verification. Before using the resolved document the server MUST verify the
@@ -5042,7 +5043,7 @@ encrypting every Resource under a single long-lived key, writers encrypt each
 Resource under whichever epoch was current when it was written; the
 Collection's `encryption` descriptor carries the full, append-only roster of
 epochs, so the roster as a whole reads as the Collection's access history. The
-full client-side construction is specified in [[WAS-EC]]; this section defines
+full client-side construction is specified in [[PWS-EC]]; this section defines
 only what the [=server=] stores and validates.
 
 An encrypted Collection with a single shared key set has no cryptographic
@@ -5125,7 +5126,7 @@ client blinds the attribute names and values it stores in an envelope's
 * `id` - A non-empty string identifying the blinding key, opaque to the
   server. It is the value an envelope's `indexed[].hmac.id` carries and the
   value a `blinded-index` query names as its `index`.
-* `type` - A non-empty string naming the key type (the [[WAS-EC]] profile uses
+* `type` - A non-empty string naming the key type (the [[PWS-EC]] profile uses
   `Sha256HmacKey2019`). Servers MUST treat the value as opaque.
 * `recipients` - A non-empty array of wrapped-key entries, one per reader, in
   exactly the `recipients` entry shape of an epoch (see
@@ -5137,7 +5138,7 @@ As with the epoch members, nothing secret appears here: the blinding secret
 travels only as per-reader wrapped ciphertext, and the server never unwraps
 it. How the key is minted, which readers hold it, and how its `recipients` are
 maintained alongside the epochs' are client-side matters defined by
-[[WAS-EC]]. One property of the member does matter to the server: the
+[[PWS-EC]]. One property of the member does matter to the server: the
 blinding key is permanent. Every blinded token in the Collection is computed
 under it, so replacing or dropping it would orphan every blinded index at
 once. The server therefore treats a stored `hmac` member as immutable in its
@@ -5146,7 +5147,7 @@ with the epoch members, this validation is part of recognizing the `edv`
 scheme: a server that does not support encrypted Collections, or that stores
 descriptors it does not enforce (see [[[#encryption-scheme-registry]]]),
 treats `hmac` as an opaque member. The
-[[WAS-EC]] profile goes further and installs the key when the Collection is
+[[PWS-EC]] profile goes further and installs the key when the Collection is
 provisioned, since envelopes written before it carry no tokens. This
 specification leaves that timing rule to clients and does not require the
 server to enforce it.
@@ -5283,7 +5284,7 @@ reader walking a listing
 <div class="informative">
 
 The reference construction (implemented by `@interop/was-client` and
-normatively specified in [[WAS-EC]]); other constructions are conformant at
+normatively specified in [[PWS-EC]]); other constructions are conformant at
 this specification's level so long as stored envelopes keep satisfying the
 [`edv` envelope profile](#encryption-scheme-registry):
 
@@ -5305,7 +5306,7 @@ this specification's level so long as stored envelopes keep satisfying the
   sole recipient). The stored envelope is the ordinary EDV Encrypted Document
   shape; only the key resolution process differs from a native EDV. Each
   envelope additionally binds its epoch into the JWE protected header
-  ([[WAS-EC]]'s `was` binding), checked unconditionally on read.
+  ([[PWS-EC]]'s `was` binding), checked unconditionally on read.
 * The **descriptor's `recipients` entries wrap the 32-byte epoch secret to each
   reader's own key-agreement key** with `ECDH-ES+A256KW` (ephemeral-static
   ECDH, the RFC 7518 Concat KDF, AES key wrap). A reader finds its `kid` in an
@@ -5320,7 +5321,7 @@ this specification's level so long as stored envelopes keep satisfying the
   replica select and unwrap the epoch key before fetching the envelope. The
   authoritative epoch is the envelope's own -- the JWE recipient `kid`
   names it, and the AEAD-bound epoch binding is verified against the
-  decrypting key ([[WAS-EC]]). An absent stamp therefore just means
+  decrypting key ([[PWS-EC]]). An absent stamp therefore just means
   route-after-fetch; it is never treated as "assume `currentEpoch`", and
   there are no unstamped pre-epoch resources to tolerate.
 * **Writes** always encrypt under `currentEpoch` and stamp it via
@@ -5577,8 +5578,8 @@ attributes, so that a [=server=] can match encrypted documents without seeing
 plaintext attribute names or values. Its semantics follow the query operation of
 the [Encrypted Data Vaults](https://identity.foundation/edv-spec/) specification
 (the same specification the [[[#encryption-scheme-registry]]] references for the
-`edv` envelope). This profile is a WAS-EC affordance: a server that serves it
-advertises `blinded-index-query` in its WAS-EC version entry's `features`
+`edv` envelope). This profile is a PWS-EC affordance: a server that serves it
+advertises `blinded-index-query` in its PWS-EC version entry's `features`
 array (see [[[#service-description-data-model]]]).
 
 Documents opt in by carrying the EDV `indexed` member: an array of entries of the
@@ -5638,7 +5639,7 @@ Response body (a document page):
 
 <div class="note">
 
-Cursor pagination is a deliberate WAS extension over the Encrypted Data Vaults
+Cursor pagination is a deliberate PWS extension over the Encrypted Data Vaults
 query operation, which offers only `limit` together with a `hasMore` flag and no
 means to fetch the next page. A server that also implements the EDV query
 operation directly may expose `limit`/`hasMore` there while offering the
@@ -5698,29 +5699,29 @@ claim the same triple.
 
 <section class="appendix">
 
-## EDV-over-WAS Profile v0.1 {#edv-over-was-profile-v0-1}
+## EDV-over-PWS Profile v0.1 {#edv-over-pws-profile-v0-1}
 
 This appendix is normative for clients that claim conformance to it.
 
 <div class="note">
 This profile is a **client-side layout convention**: it constrains how a client
 maps [Encrypted Data Vault](https://identity.foundation/edv-spec/) (EDV)
-operations onto ordinary WAS operations. A
-conforming WAS server needs nothing beyond the features it already advertises,
+operations onto ordinary PWS operations. A
+conforming PWS server needs nothing beyond the features it already advertises,
 and never learns that it is hosting an EDV. Its normative requirements therefore
 bind the *client*; a server's obligations are only the ones it already has for
-the underlying WAS operations.
+the underlying PWS operations.
 </div>
 
-### Purpose {#edv-over-was-purpose}
+### Purpose {#edv-over-pws-purpose}
 
 An Encrypted Data Vault stores JWE-encrypted documents that its server can query
 by blinded index but never decrypt. A client can realize all of that behavior on
-a plain WAS server, because a WAS Resource is an opaque byte store and
-WAS already carries the pieces an EDV needs. This profile fixes the mapping so
+a plain PWS server, because a PWS Resource is an opaque byte store and
+PWS already carries the pieces an EDV needs. This profile fixes the mapping so
 that independent clients interoperate over the same encrypted Collection:
 
-| EDV concept           | WAS realization                                                                    |
+| EDV concept           | PWS realization                                                                    |
 |-----------------------|------------------------------------------------------------------------------------|
 | Vault                 | [=collection=]                                                                     |
 | Document              | Resource (the EDV envelope stored as its content)                                  |
@@ -5730,12 +5731,12 @@ that independent clients interoperate over the same encrypted Collection:
 
 Encryption itself is out of scope of the server entirely: the client holds all
 keys and performs all encryption, decryption, and index blinding, as required by
-[[[#stored-data-is-opaque-to-the-storage-provider]]]. The server enforces WAS
+[[[#stored-data-is-opaque-to-the-storage-provider]]]. The server enforces PWS
 authorization, maximum-privacy `404`s, and policies over the ciphertext
 unchanged; the encryption is defense in depth layered on top, not a replacement
-for the WAS authorization model.
+for the PWS authorization model.
 
-### The encryption descriptor {#edv-over-was-descriptor}
+### The encryption descriptor {#edv-over-pws-descriptor}
 
 A Collection realizing this profile declares the `encryption` descriptor
 `{ "scheme": "edv", "version": 1 }` in its Collection Metadata object (see
@@ -5759,9 +5760,9 @@ envelopes. Multi-recipient encryption is carried either directly, in the JWE
 through the key-epoch indirection of [[[#key-epochs]]], whose public
 bookkeeping (the descriptor's `epochs` roster and the Resource `epoch` stamp)
 the server stores and serves without interpreting; the client-side epoch
-construction is specified in [[WAS-EC]].
+construction is specified in [[PWS-EC]].
 
-### Document layout {#edv-over-was-document-layout}
+### Document layout {#edv-over-pws-document-layout}
 
 A client stores each EDV document as the EDV Encrypted Document envelope -- the
 JSON object `{ id, sequence, indexed?, jwe }` -- as the Resource's content, at
@@ -5769,15 +5770,15 @@ the Resource id equal to the EDV document id. The envelope is the `edv` scheme's
 registered wire format (see [[[#encryption-scheme-registry]]]); a client SHOULD
 write it under the JWE JSON Serialization media type `application/jose+json`
 ([[RFC7516]]) where the server registers a parser for it, and MAY fall back to
-`application/json`, which an unmodified WAS server accepts. The plaintext type of
+`application/json`, which an unmodified PWS server accepts. The plaintext type of
 the resource, and any user-visible metadata, ride *inside* the JWE and are never
 server-visible; the server stores one opaque envelope regardless of what the
 decrypted document is.
 
-### Sequence mapping {#edv-over-was-sequence}
+### Sequence mapping {#edv-over-pws-sequence}
 
 EDV gives every document a monotonic `sequence` and enforces `previous + 1`
-atomically server-side. This profile maps that onto WAS conditional writes (see
+atomically server-side. This profile maps that onto PWS conditional writes (see
 [[[#conditional-requests]]]):
 
 * A fresh insert is a `PUT` carrying `If-None-Match: *`, so a collision with an
@@ -5787,14 +5788,14 @@ atomically server-side. This profile maps that onto WAS conditional writes (see
   and writes it back with `If-Match` pinned to the `ETag` observed on that read,
   so a concurrent writer's stale update is a `412` rather than a lost update.
 
-Both preconditions are honored on any conformant WAS server, since conditional
+Both preconditions are honored on any conformant PWS server, since conditional
 writes are a baseline server requirement (see [[[#conditional-requests]]]).
 
-### Chunked streams {#edv-over-was-chunked-streams}
+### Chunked streams {#edv-over-pws-chunked-streams}
 
-A large or streamed EDV document is stored as chunks, using WAS chunk
+A large or streamed EDV document is stored as chunks, using PWS chunk
 addressing (see [[[#chunked-resources]]]) against a server that implements
-[[WAS-EC]]:
+[[PWS-EC]]:
 
 1. The client writes the document envelope **first**, as an ordinary Resource
    (satisfying the [[[#store-chunk-operation]]] rule that the parent Resource must
@@ -5830,7 +5831,7 @@ then, a deployment that does not trust its storage provider for availability and
 ordering integrity SHOULD treat streamed documents accordingly.
 </div>
 
-### Search and uniqueness {#edv-over-was-search}
+### Search and uniqueness {#edv-over-pws-search}
 
 Content search over encrypted documents uses the `blinded-index` query profile
 (see [[[#query-profile-blinded-index]]]): a client attaches blinded (HMAC'd)
@@ -5838,16 +5839,16 @@ Content search over encrypted documents uses the `blinded-index` query profile
 `POST /space/{space_id}/{collection_id}/query`. Blinded-attribute uniqueness
 (`unique: true`) is enforced server-side by that profile (see
 [[[#query-profile-blinded-index]]], *Unique blinded attributes*). Both require
-a server whose WAS-EC version entry advertises `blinded-index-query` (see
+a server whose PWS-EC version entry advertises `blinded-index-query` (see
 [[[#service-description-data-model]]]); a client SHOULD gate their use on it.
 
-### What this profile does not provide {#edv-over-was-limits}
+### What this profile does not provide {#edv-over-pws-limits}
 
 Relative to a dedicated EDV server, this profile reaches full parity for the
 affordances a given server advertises, and has these limitations otherwise:
 
 * **Server-side blinded-index query** and **`unique: true` enforcement**
-  require a server whose WAS-EC version entry advertises
+  require a server whose PWS-EC version entry advertises
   `blinded-index-query`. Without it, a client cannot query blinded attributes
   at the server or rely on it to enforce uniqueness; it must fetch-and-filter
   client-side (or, as the reference codec does, mint restrict-mode document ids
@@ -5855,7 +5856,7 @@ affordances a given server advertises, and has these limitations otherwise:
   constraint is at best a racy client-side read-then-write.
 * **Stream ordering / truncation integrity** is not authenticated by the current
   chunk framing (see the security consideration in
-  [[[#edv-over-was-chunked-streams]]]).
+  [[[#edv-over-pws-chunked-streams]]]).
 
 For a small single-writer Collection (for example, a credential wallet) these
 limitations rarely matter; a large or multi-writer Collection wants a server
@@ -5884,28 +5885,28 @@ status code depending on the operation.
 
 | `type` URI                                                  | Anchor                                                                      | Typical status | Description                                                                                                                                                                                                                                                                                                                                                                                                      |
 |-------------------------------------------------------------|-----------------------------------------------------------------------------|----------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `https://wallet.storage/spec#not-found`                     | <dfn id="not-found">not-found</dfn>                                         | 404            | The resource (Space, Collection, or Resource) does not exist, or the caller is not authorized to access it. These two conditions are deliberately indistinguishable -- see the privacy note below.                                                                                                                                                                                                               |
-| `https://wallet.storage/spec#invalid-id`                    | <dfn id="invalid-id">invalid-id</dfn>                                       | 400            | A Space, Collection, or Resource `id` is missing or not URL-safe.                                                                                                                                                                                                                                                                                                                                                |
-| `https://wallet.storage/spec#reserved-id`                   | <dfn id="reserved-id">reserved-id</dfn>                                     | 409            | A client-supplied `id` collides with a [[[#reserved-path-segment-registry]]] segment.                                                                                                                                                                                                                                                                                                                            |
-| `https://wallet.storage/spec#id-conflict`                   | <dfn id="id-conflict">id-conflict</dfn>                                     | 409            | A client-supplied `id` in a `POST` create operation already exists. Also returned when a write would violate a `unique: true` blinded-attribute claim (see [[[#query-profile-blinded-index]]]) or a `unique: true` [=plaintext index=] claim, and when a Collection update adds a `unique: true` plaintext index over Resources that already violate it (see [[[#collection-metadata-data-model]]]). (Create-or-replace by `id` is done idempotently via `PUT`, which does not conflict.)                                                                                                                                                                                                                                                         |
-| `https://wallet.storage/spec#invalid-request-body`          | <dfn id="invalid-request-body">invalid-request-body</dfn>                   | 400            | The request body is missing or invalid (e.g. a required property is absent). Entries in `errors` SHOULD carry a `pointer` to the offending field.                                                                                                                                                                                                                                                                |
-| `https://wallet.storage/spec#invalid-cursor`                | <dfn id="invalid-cursor">invalid-cursor</dfn>                               | 400            | A pagination `cursor` query parameter is malformed or can no longer be honored (e.g. an expired snapshot). See [[[#pagination]]].                                                                                                                                                                                                                                                                                |
-| `https://wallet.storage/spec#missing-content-type`          | <dfn id="missing-content-type">missing-content-type</dfn>                   | 400            | A required `Content-Type` header is missing.                                                                                                                                                                                                                                                                                                                                                                     |
-| `https://wallet.storage/spec#missing-authorization`         | <dfn id="missing-authorization">missing-authorization</dfn>                 | 401            | Required `Authorization` / `Capability-Invocation` headers (or proof of possession) are missing.                                                                                                                                                                                                                                                                                                                 |
-| `https://wallet.storage/spec#invalid-authorization-header`  | <dfn id="invalid-authorization-header">invalid-authorization-header</dfn>   | 400            | An `Authorization`, `Capability-Invocation`, or `Digest` header is malformed, unparseable, or failed verification.                                                                                                                                                                                                                                                                                               |
-| `https://wallet.storage/spec#controller-mismatch`           | <dfn id="controller-mismatch">controller-mismatch</dfn>                     | 400            | The capability invocation in a Create Space request is not currently authorized by the `controller` supplied in the request body: it is neither signed by that DID nor accompanied by a valid, unexpired delegation chain rooted in it. Servers SHOULD differentiate the cause (chain rooted elsewhere, expired delegation, failed proof) in the `detail` string where they can; see [[[#create-space-errors]]]. |
-| `https://wallet.storage/spec#unsupported-backend`           | <dfn id="unsupported-backend">unsupported-backend</dfn>                     | 409            | A requested `backend` id is not in the space's [[[#space-backends-available]]] list.                                                                                                                                                                                                                                                                                                                             |
-| `https://wallet.storage/spec#encryption-immutable`          | <dfn id="encryption-immutable">encryption-immutable</dfn>                   | 409            | A Collection update tried to change the `scheme`, decrease or remove the `version`, or clear an existing `encryption` descriptor; or it tried to change the `id` or `type` of the descriptor's `hmac` member, or remove that member. The descriptor is set-once, version-monotonic: declaring it on a Collection that lacks one is allowed (and re-declaring the standing values is a no-op), but changing its `scheme`, moving its `version` backward, or clearing it on a populated Collection would corrupt the stored, client-encrypted Resources, and replacing or dropping the blinding key would orphan every blinded index. See [[[#collection-metadata-data-model]]] and [[[#blinding-key-member]]]. |
-| `https://wallet.storage/spec#encryption-history-log-governed` | <dfn id="encryption-history-log-governed">encryption-history-log-governed</dfn> | 409            | A Collection update carried an `encryption` member on a Collection whose descriptor is governed by its history log. The member is read-only on that path: it is derived from the log's head entry, and changes by an append to the log at the Collection's `meta/log` sub-resource. See [[[#collection-governing-history-log]]]. |
-| `https://wallet.storage/spec#encryption-scheme-mismatch`    | <dfn id="encryption-scheme-mismatch">encryption-scheme-mismatch</dfn>       | 422            | A write into an encrypted Collection -- a Resource's content, or the `custom` object of a Resource's or the Collection's own Metadata -- had a body (or `Content-Type`) that does not conform to the Collection's declared `encryption` scheme envelope profile. Reachable only by a caller already authorized to write -- see [[[#encryption-scheme-registry]]].                                                                                                                                           |
-| `https://wallet.storage/spec#unsupported-encryption-scheme` | <dfn id="unsupported-encryption-scheme">unsupported-encryption-scheme</dfn> | 400            | A Collection create/update declared an `encryption` `scheme` (or a `version` of one) the server does not recognize or support. See [[[#encryption-scheme-registry]]].                                                                                                                                                                                                                                                                    |
-| `https://wallet.storage/spec#precondition-failed`           | <dfn id="precondition-failed">precondition-failed</dfn>                     | 412            | A conditional write's `If-Match` / `If-None-Match` precondition evaluated false: the Resource's current version did not match, or a create-if-absent target already exists. Header-driven and distinct from the `409` conflict kinds. See [[[#conditional-requests]]].                                                                                                                                           |
-| `https://wallet.storage/spec#quota-exceeded`                | <dfn id="quota-exceeded">quota-exceeded</dfn>                               | 507            | A write was rejected because the target backend's storage quota is exhausted. See [[[#quotas]]].                                                                                                                                                                                                                                                                                                                 |
-| `https://wallet.storage/spec#payload-too-large`             | <dfn id="payload-too-large">payload-too-large</dfn>                         | 413            | An upload exceeds the target backend's `maxUploadBytes` constraint (see [[[#quotas]]]). Note that unlike [=quota-exceeded=], this rejection is per-request: smaller uploads may still succeed.                                                                                                                                                                                                                   |
-| `https://wallet.storage/spec#unsupported-operation`         | <dfn id="unsupported-operation">unsupported-operation</dfn>                 | 501            | An optional operation that this server or the target backend does not support (for example, a per-collection quota report on a backend without per-collection accounting).                                                                                                                                                                                                                                       |
-| `https://wallet.storage/spec#invalid-import`                | <dfn id="invalid-import">invalid-import</dfn>                               | 400            | An uploaded archive is not a valid WAS space export. The import operation itself is reserved and not yet specified (see [[[#reserved-path-segment-registry]]]); this kind is registered ahead of it so implementations converge on one error shape.                                                                                                                                                              |
-| `https://wallet.storage/spec#storage-error`                 | <dfn id="storage-error">storage-error</dfn>                                 | 500            | An underlying storage operation failed.                                                                                                                                                                                                                                                                                                                                                                          |
-| `https://wallet.storage/spec#internal-error`                | <dfn id="internal-error">internal-error</dfn>                               | 500            | An unexpected server-side fault with no more specific kind.                                                                                                                                                                                                                                                                                                                                                      |
+| `https://w3id.org/pws#not-found`                     | <dfn id="not-found">not-found</dfn>                                         | 404            | The resource (Space, Collection, or Resource) does not exist, or the caller is not authorized to access it. These two conditions are deliberately indistinguishable -- see the privacy note below.                                                                                                                                                                                                               |
+| `https://w3id.org/pws#invalid-id`                    | <dfn id="invalid-id">invalid-id</dfn>                                       | 400            | A Space, Collection, or Resource `id` is missing or not URL-safe.                                                                                                                                                                                                                                                                                                                                                |
+| `https://w3id.org/pws#reserved-id`                   | <dfn id="reserved-id">reserved-id</dfn>                                     | 409            | A client-supplied `id` collides with a [[[#reserved-path-segment-registry]]] segment.                                                                                                                                                                                                                                                                                                                            |
+| `https://w3id.org/pws#id-conflict`                   | <dfn id="id-conflict">id-conflict</dfn>                                     | 409            | A client-supplied `id` in a `POST` create operation already exists. Also returned when a write would violate a `unique: true` blinded-attribute claim (see [[[#query-profile-blinded-index]]]) or a `unique: true` [=plaintext index=] claim, and when a Collection update adds a `unique: true` plaintext index over Resources that already violate it (see [[[#collection-metadata-data-model]]]). (Create-or-replace by `id` is done idempotently via `PUT`, which does not conflict.)                                                                                                                                                                                                                                                         |
+| `https://w3id.org/pws#invalid-request-body`          | <dfn id="invalid-request-body">invalid-request-body</dfn>                   | 400            | The request body is missing or invalid (e.g. a required property is absent). Entries in `errors` SHOULD carry a `pointer` to the offending field.                                                                                                                                                                                                                                                                |
+| `https://w3id.org/pws#invalid-cursor`                | <dfn id="invalid-cursor">invalid-cursor</dfn>                               | 400            | A pagination `cursor` query parameter is malformed or can no longer be honored (e.g. an expired snapshot). See [[[#pagination]]].                                                                                                                                                                                                                                                                                |
+| `https://w3id.org/pws#missing-content-type`          | <dfn id="missing-content-type">missing-content-type</dfn>                   | 400            | A required `Content-Type` header is missing.                                                                                                                                                                                                                                                                                                                                                                     |
+| `https://w3id.org/pws#missing-authorization`         | <dfn id="missing-authorization">missing-authorization</dfn>                 | 401            | Required `Authorization` / `Capability-Invocation` headers (or proof of possession) are missing.                                                                                                                                                                                                                                                                                                                 |
+| `https://w3id.org/pws#invalid-authorization-header`  | <dfn id="invalid-authorization-header">invalid-authorization-header</dfn>   | 400            | An `Authorization`, `Capability-Invocation`, or `Digest` header is malformed, unparseable, or failed verification.                                                                                                                                                                                                                                                                                               |
+| `https://w3id.org/pws#controller-mismatch`           | <dfn id="controller-mismatch">controller-mismatch</dfn>                     | 400            | The capability invocation in a Create Space request is not currently authorized by the `controller` supplied in the request body: it is neither signed by that DID nor accompanied by a valid, unexpired delegation chain rooted in it. Servers SHOULD differentiate the cause (chain rooted elsewhere, expired delegation, failed proof) in the `detail` string where they can; see [[[#create-space-errors]]]. |
+| `https://w3id.org/pws#unsupported-backend`           | <dfn id="unsupported-backend">unsupported-backend</dfn>                     | 409            | A requested `backend` id is not in the space's [[[#space-backends-available]]] list.                                                                                                                                                                                                                                                                                                                             |
+| `https://w3id.org/pws#encryption-immutable`          | <dfn id="encryption-immutable">encryption-immutable</dfn>                   | 409            | A Collection update tried to change the `scheme`, decrease or remove the `version`, or clear an existing `encryption` descriptor; or it tried to change the `id` or `type` of the descriptor's `hmac` member, or remove that member. The descriptor is set-once, version-monotonic: declaring it on a Collection that lacks one is allowed (and re-declaring the standing values is a no-op), but changing its `scheme`, moving its `version` backward, or clearing it on a populated Collection would corrupt the stored, client-encrypted Resources, and replacing or dropping the blinding key would orphan every blinded index. See [[[#collection-metadata-data-model]]] and [[[#blinding-key-member]]]. |
+| `https://w3id.org/pws#encryption-history-log-governed` | <dfn id="encryption-history-log-governed">encryption-history-log-governed</dfn> | 409            | A Collection update carried an `encryption` member on a Collection whose descriptor is governed by its history log. The member is read-only on that path: it is derived from the log's head entry, and changes by an append to the log at the Collection's `meta/log` sub-resource. See [[[#collection-governing-history-log]]]. |
+| `https://w3id.org/pws#encryption-scheme-mismatch`    | <dfn id="encryption-scheme-mismatch">encryption-scheme-mismatch</dfn>       | 422            | A write into an encrypted Collection -- a Resource's content, or the `custom` object of a Resource's or the Collection's own Metadata -- had a body (or `Content-Type`) that does not conform to the Collection's declared `encryption` scheme envelope profile. Reachable only by a caller already authorized to write -- see [[[#encryption-scheme-registry]]].                                                                                                                                           |
+| `https://w3id.org/pws#unsupported-encryption-scheme` | <dfn id="unsupported-encryption-scheme">unsupported-encryption-scheme</dfn> | 400            | A Collection create/update declared an `encryption` `scheme` (or a `version` of one) the server does not recognize or support. See [[[#encryption-scheme-registry]]].                                                                                                                                                                                                                                                                    |
+| `https://w3id.org/pws#precondition-failed`           | <dfn id="precondition-failed">precondition-failed</dfn>                     | 412            | A conditional write's `If-Match` / `If-None-Match` precondition evaluated false: the Resource's current version did not match, or a create-if-absent target already exists. Header-driven and distinct from the `409` conflict kinds. See [[[#conditional-requests]]].                                                                                                                                           |
+| `https://w3id.org/pws#quota-exceeded`                | <dfn id="quota-exceeded">quota-exceeded</dfn>                               | 507            | A write was rejected because the target backend's storage quota is exhausted. See [[[#quotas]]].                                                                                                                                                                                                                                                                                                                 |
+| `https://w3id.org/pws#payload-too-large`             | <dfn id="payload-too-large">payload-too-large</dfn>                         | 413            | An upload exceeds the target backend's `maxUploadBytes` constraint (see [[[#quotas]]]). Note that unlike [=quota-exceeded=], this rejection is per-request: smaller uploads may still succeed.                                                                                                                                                                                                                   |
+| `https://w3id.org/pws#unsupported-operation`         | <dfn id="unsupported-operation">unsupported-operation</dfn>                 | 501            | An optional operation that this server or the target backend does not support (for example, a per-collection quota report on a backend without per-collection accounting).                                                                                                                                                                                                                                       |
+| `https://w3id.org/pws#invalid-import`                | <dfn id="invalid-import">invalid-import</dfn>                               | 400            | An uploaded archive is not a valid PWS space export. The import operation itself is reserved and not yet specified (see [[[#reserved-path-segment-registry]]]); this kind is registered ahead of it so implementations converge on one error shape.                                                                                                                                                              |
+| `https://w3id.org/pws#storage-error`                 | <dfn id="storage-error">storage-error</dfn>                                 | 500            | An underlying storage operation failed.                                                                                                                                                                                                                                                                                                                                                                          |
+| `https://w3id.org/pws#internal-error`                | <dfn id="internal-error">internal-error</dfn>                               | 500            | An unexpected server-side fault with no more specific kind.                                                                                                                                                                                                                                                                                                                                                      |
 
 **Privacy: the `not-found` kind is intentionally merged.** Under the principle
 of maximum privacy (see [[[#error-handling]]]), an unauthorized client MUST NOT
@@ -5948,7 +5949,7 @@ HTTP/1.1 404 Not Found
 Content-type: application/problem+json
 
 {
-  "type": "https://wallet.storage/spec#not-found",
+  "type": "https://w3id.org/pws#not-found",
   "title": "Resource not found or insufficient authorization."
 }
 ```
@@ -5960,7 +5961,7 @@ HTTP/1.1 400 Bad Request
 Content-type: application/problem+json
 
 {
-  "type": "https://wallet.storage/spec#invalid-id",
+  "type": "https://w3id.org/pws#invalid-id",
   "title": "Invalid Space id.",
   "errors": [
     {
@@ -5979,7 +5980,7 @@ HTTP/1.1 409 Conflict
 Content-type: application/problem+json
 
 {
-  "type": "https://wallet.storage/spec#reserved-id",
+  "type": "https://w3id.org/pws#reserved-id",
   "title": "Invalid collection id (from reserved list)."
 }
 ```
@@ -5992,7 +5993,7 @@ HTTP/1.1 409 Conflict
 Content-type: application/problem+json
 
 {
-  "type": "https://wallet.storage/spec#id-conflict",
+  "type": "https://w3id.org/pws#id-conflict",
   "title": "A Collection with this id already exists.",
   "errors": [
     {
@@ -6011,7 +6012,7 @@ HTTP/1.1 412 Precondition Failed
 Content-type: application/problem+json
 
 {
-  "type": "https://wallet.storage/spec#precondition-failed",
+  "type": "https://w3id.org/pws#precondition-failed",
   "title": "The resource was modified by another write.",
   "errors": [
     {
@@ -6029,7 +6030,7 @@ HTTP/1.1 400 Bad Request
 Content-type: application/problem+json
 
 {
-  "type": "https://wallet.storage/spec#invalid-request-body",
+  "type": "https://w3id.org/pws#invalid-request-body",
   "title": "Invalid Create Space body.",
   "errors": [
     {
@@ -6048,7 +6049,7 @@ HTTP/1.1 401 Unauthorized
 Content-type: application/problem+json
 
 {
-  "type": "https://wallet.storage/spec#missing-authorization",
+  "type": "https://w3id.org/pws#missing-authorization",
   "title": "Invalid Create Space request.",
   "errors": [
     {
@@ -6070,7 +6071,7 @@ HTTP/1.1 400 Bad Request
 Content-type: application/problem+json
 
 {
-  "type": "https://wallet.storage/spec#controller-mismatch",
+  "type": "https://w3id.org/pws#controller-mismatch",
   "title": "Invalid Create Space request.",
   "errors": [
     {
@@ -6089,7 +6090,7 @@ HTTP/1.1 409 Conflict
 Content-type: application/problem+json
 
 {
-  "type": "https://wallet.storage/spec#unsupported-backend",
+  "type": "https://w3id.org/pws#unsupported-backend",
   "title": "Unsupported backend id, check the space's 'backends available' list."
 }
 ```
@@ -6104,7 +6105,7 @@ HTTP/1.1 409 Conflict
 Content-type: application/problem+json
 
 {
-  "type": "https://wallet.storage/spec#encryption-immutable",
+  "type": "https://w3id.org/pws#encryption-immutable",
   "title": "Collection encryption descriptor is immutable."
 }
 ```
@@ -6119,7 +6120,7 @@ HTTP/1.1 409 Conflict
 Content-type: application/problem+json
 
 {
-  "type": "https://wallet.storage/spec#encryption-history-log-governed",
+  "type": "https://w3id.org/pws#encryption-history-log-governed",
   "title": "Collection encryption descriptor is governed by its history log."
 }
 ```
@@ -6134,7 +6135,7 @@ HTTP/1.1 422 Unprocessable Content
 Content-type: application/problem+json
 
 {
-  "type": "https://wallet.storage/spec#encryption-scheme-mismatch",
+  "type": "https://w3id.org/pws#encryption-scheme-mismatch",
   "title": "Body does not conform to the Collection's encryption scheme."
 }
 ```
@@ -6147,7 +6148,7 @@ HTTP/1.1 507 Insufficient Storage
 Content-type: application/problem+json
 
 {
-  "type": "https://wallet.storage/spec#quota-exceeded",
+  "type": "https://w3id.org/pws#quota-exceeded",
   "title": "Storage quota exceeded for backend 'default'."
 }
 ```
@@ -6160,7 +6161,7 @@ HTTP/1.1 413 Content Too Large
 Content-type: application/problem+json
 
 {
-  "type": "https://wallet.storage/spec#payload-too-large",
+  "type": "https://w3id.org/pws#payload-too-large",
   "title": "Upload exceeds the backend's maximum upload size.",
   "errors": [
     {
@@ -6178,7 +6179,7 @@ HTTP/1.1 501 Not Implemented
 Content-type: application/problem+json
 
 {
-  "type": "https://wallet.storage/spec#unsupported-operation",
+  "type": "https://w3id.org/pws#unsupported-operation",
   "title": "Backend 'default' does not support per-collection quota reports."
 }
 ```
