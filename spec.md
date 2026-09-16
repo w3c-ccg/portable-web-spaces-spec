@@ -23,14 +23,16 @@ This specification aims to provide:
 * A tiered composable **data model** for storage primitives
 * An **HTTP API** binding for storage operations (other bindings, such as JSON-RPC
   or CBOR-based RPCs, are left for future work).
-* An authorization profile for use with this storage, see
-  [[[#pws-authorization-profile-v0-1]]].
+* An **authorization contract** that every authorization profile meets, see
+  [[[#authorization]]]. The baseline profile, zCaps over HTTP Signatures, is
+  a companion specification, [[PWS-AUTHZ]].
 
 <div class="note">
 This document is deliberately comprehensive: it specifies both a small required
 core and a set of optional extensions. A conformant minimal server implements
-only Resource CRUD ([[[#resources-and-blobs]]]) and the authorization profile
-([[[#pws-authorization-profile-v0-1]]]); every other endpoint group is OPTIONAL.
+only Resource CRUD ([[[#resources-and-blobs]]]) and the baseline authorization
+profile ([[[#authorization]]], [[PWS-AUTHZ]]); every other endpoint group is
+OPTIONAL.
 See [[[#scope-and-conformance-profiles]]] for the full conformance-tier map, and
 [[[#quickstart-your-first-request]]] to watch a first request succeed.
 </div>
@@ -100,6 +102,13 @@ This subsection is non-normative.
     `governed-history-logs`) are now tokens of its own version entry rather
     than backend features, and serving the chunk endpoints is now a plain
     requirement of PWS-EC conformance rather than a token at all.
+  * The zCap authorization profile and the `PublicCanRead` policy type moved
+    to a companion specification, [[PWS-AUTHZ]], with wire behavior
+    unchanged. This document keeps the contract every authorization profile
+    meets (see [[[#authorization]]]) and gains a [[[#policy-type-registry]]].
+    The `signatureAlgorithms` and `zcapCryptosuites` members moved from this
+    specification's [=version entry=] to the profile's own entry under
+    `https://w3id.org/pws/authz-profile`, which a server now lists.
 
 No stored data moves across the v0.4-to-v0.5 path changes. The durable
 artifacts to audit are capabilities. A delegated capability whose
@@ -120,7 +129,8 @@ document relies on, so that a section read in isolation is still intelligible.
 `Authorization` header abbreviates a signed [=zCap=] (capability) invocation
 (as opposed to a bearer token). Reads are authorized in PWS just as writes are.
 The expanded form -- with the `Digest`, `Capability-Invocation`, and `Signature`
-headers -- appears once, in [[[#performing-authorized-api-calls]]].
+headers -- appears once, in the
+[worked example](https://w3c-ccg.github.io/wallet-attached-storage-spec/authz-profile/#request-body-integrity-digest-header) of [[PWS-AUTHZ]].
 
 **Every path has one canonical form, and a trailing slash marks a container.**
 A container -- a Space or a Collection -- is canonically written with a
@@ -131,8 +141,9 @@ forms of a path name the same thing. A request to the non-canonical form is not
 a different operation, and a [=server=] SHOULD answer it with a
 `308 Permanent Redirect` to the canonical form. No two paths defined by this
 specification differ only by a trailing slash. Because a signed capability
-invocation covers the request target (see
-[[[#performing-authorized-api-calls]]]), a client that follows such a redirect
+invocation covers the full request URL (see
+[Capability Invocation](https://w3c-ccg.github.io/wallet-attached-storage-spec/authz-profile/#capability-invocation) in [[PWS-AUTHZ]]), a
+client that follows such a redirect
 MUST sign again for the new target rather than replay its `Authorization`
 header; sending the canonical form to begin with avoids the round trip.
 
@@ -165,7 +176,8 @@ placeholders for those identifiers.
 
 **Normative lists live in the appendices.** Error `type` URIs are catalogued in
 [[[#error-type-registry]]], path segments this specification reserves in
-[[[#reserved-path-segment-registry]]], and client-side encryption schemes in
+[[[#reserved-path-segment-registry]]], access control policy types in
+[[[#policy-type-registry]]], and client-side encryption schemes in
 [[[#encryption-scheme-registry]]]. Those registries are normative: they, not the
 surrounding prose, are where an implementation looks such values up.
 </div>
@@ -196,11 +208,12 @@ Repositories, Spaces, Collections, then Resources), which is convenient as a
 reference but is the reverse of the tiers. If you're new to the spec, scan the
 profile table below for the conformance tiers, then walk through
 [[[#quickstart-your-first-request]]] to watch a request succeed. The core tier
-is just [[[#resources-and-blobs]]] plus [[[#pws-authorization-profile-v0-1]]].
+is just [[[#resources-and-blobs]]] plus the baseline authorization profile
+([[[#authorization]]], [[PWS-AUTHZ]]).
 
 | Profile               | Adds                                                                                             | Defining sections                                                                                     | Advertised as (see [[[#service-description-data-model]]]) |
 |-----------------------|--------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------|-----------------------------------------------------------|
-| **Minimal**           | Resource CRUD (KV + blob read/write) + authorization + the service description                   | [[[#resources-and-blobs]]], [[[#pws-authorization-profile-v0-1]]], [[[#service-description]]]         | the version entry itself                                  |
+| **Minimal**           | Resource CRUD (KV + blob read/write) + authorization + the service description                   | [[[#resources-and-blobs]]], [[[#authorization]]] with [[PWS-AUTHZ]], [[[#service-description]]]       | the version entry itself, plus the [[PWS-AUTHZ]] entry    |
 | **+ Listing**         | list resources / collections / spaces                                                            | [[[#list-collection-operation]]], [[[#list-all-collections-operation]]], [[[#list-spaces-operation]]] | `listing`                                                 |
 | **+ Collection mgmt** | create / manage collections in a Space                                                           | [[[#collections]]]                                                                                    | `collection-management`                                   |
 | **+ Space mgmt**      | manage an individual Space                                                                       | [[[#read-space-operation]]] (Space endpoints)                                                         | `space-management`                                        |
@@ -225,7 +238,8 @@ Space, through the linkset feature-detection mechanism (from [[RFC9264]]; see
 
 **Normative status.** Section back-placement does not imply informative status.
 Everything from [[[#introduction]]] through [[[#quotas]]] is normative, as are the
-appendices [[[#pagination]]], [[[#reserved-path-segment-registry]]],
+appendices [[[#pagination]]], [[[#space-controller-did-method-registry]]],
+[[[#policy-type-registry]]], [[[#reserved-path-segment-registry]]],
 [[[#encryption-scheme-registry]]], and [[[#error-type-registry]]] (each of which
 also carries an inline "This appendix is normative." banner). The remaining
 appendices -- [[[#goals-and-requirements]]] and [[[#iana-considerations]]] -- are
@@ -276,10 +290,11 @@ Content-type: application/json
 
 (The `Authorization: ...` placeholder stands for a signed zCap invocation).
 PWS reads are authorized too, so the header is required on the
-`GET` just as on the `PUT`. How that invocation is constructed is defined in
-[[[#performing-authorized-api-calls]]], and its fully expanded form -- with the
-`Digest`, `Capability-Invocation`, and `Signature` headers spelled out -- is
-shown once in the worked example within that section. Producing that signature
+`GET` just as on the `PUT`. How that invocation is constructed is defined by
+the baseline authorization profile, [[PWS-AUTHZ]], and its fully expanded form
+-- with the `Digest`, `Capability-Invocation`, and `Signature` headers spelled
+out -- is shown once in the
+[worked example](https://w3c-ccg.github.io/wallet-attached-storage-spec/authz-profile/#request-body-integrity-digest-header) there. Producing that signature
 requires a conformant PWS client: it is an Ed25519 `did:key` capability
 invocation, not something you can hand-write with curl.
 
@@ -426,13 +441,6 @@ Required if Space endpoints or Collection endpoints are supported.
 ## Terminology
 
 <dl class="termlist definitions" data-sort="ascending">
-  <dt><dfn data-lt="action|actions|allowedAction">action (allowedAction)</dfn></dt>
-  <dd>The kind of operation a request performs on a target, named by a capability
-    so it can be authorized. PWS uses the uppercase HTTP method names
-    (<a>GET</a>, <a>POST</a>, <a>PUT</a>, <a>DELETE</a>) as its action
-    vocabulary. See section
-    [[[#authorization-actions-and-the-root-capability]]].</dd>
-
   <dt><dfn id="term-backend" data-lt="backends">backend</dfn></dt>
   <dd>A storage engine that a [=collection=]'s resources are physically stored
     on, registered at the Space level either by server configuration or by
@@ -468,7 +476,7 @@ Required if Space endpoints or Collection endpoints are supported.
 
   <dt><dfn data-lt="policies|access control policy|access control policies">policy</dfn></dt>
   <dd>A JSON document with a required <code>type</code> property that declares what
-    access a [=target=] grants to callers in general, independent of any [=zCap=]
+    access a target grants to callers in general, independent of any [=zCap=]
     a caller might present. A policy is stored at the <code>/policy</code>
     auxiliary resource of a Space, Collection, or Resource. Policies are inherited
     most-specific-wins (Resource over Collection over Space), can only broaden
@@ -486,11 +494,6 @@ Required if Space endpoints or Collection endpoints are supported.
     than the backend's <code>maxUploadBytes</code> constraint is rejected with
     [=payload-too-large=] (413). See section [[[#quotas]]].</dd>
 
-  <dt><dfn data-lt="root capabilities|root zcap">root capability</dfn></dt>
-  <dd>The implied capability for a [=target=] whose [=controller=] is the Space's
-    controller; it is the root of trust from which all other capabilities for
-    that target are delegated. See section [[[#root-capability]]].</dd>
-
   <dt><dfn data-lt="service descriptions">service description</dfn></dt>
   <dd>The JSON document through which a [=server=] advertises, without
     authorization, every specification and version it implements and the
@@ -499,15 +502,11 @@ Required if Space endpoints or Collection endpoints are supported.
     with the <code>service</code> relation pointing to it. See section
     [[[#service-description]]].</dd>
 
-  <dt><dfn data-lt="target|invocationTarget|targets">target (invocationTarget)</dfn></dt>
-  <dd>The resource a request acts on, including the full request URL (scheme,
-    host, port, and path) -- and the scope a capability authorizes. A capability's
-    `invocationTarget` MUST match the request target for the invocation to be
-    valid. See section [[[#authorization-actions-and-the-root-capability]]].</dd>
-
   <dt><dfn data-lt="zcap|zCaps|capability|authorization capability">zCap (Authorization Capability)</dfn></dt>
-  <dd>See [zCap Developer Guide](https://interop-alliance.github.io/zcap-developer-guide/) for more
-    details.</dd>
+  <dd>The delegatable object capability of the baseline authorization profile,
+    [[PWS-AUTHZ]]. See the
+    [zCap Developer Guide](https://interop-alliance.github.io/zcap-developer-guide/)
+    for more details.</dd>
 </dl>
 
 ## Identifiers {#identifiers}
@@ -563,79 +562,66 @@ operations requires an authorization system that is:
   space (or of a collection or resource) is authorized to perform any operation
   (read, write, delete, etc)
 
-As the state of the art in cross-domain authorization advances, we expect there
-to be multiple profiles and specs that could be used to perform PWS API
-calls. However, to start with, this specification will focus on a single minimal
-authorization profile.
+Authorization is pluggable. This specification defines the contract every
+authorization profile meets and the sockets a profile plugs into: the Space
+`controller` as the root of trust and the `/policy` auxiliary resource. The
+mechanism itself, how a caller proves it may act on a target, and the
+vocabulary in which a credential names the operation and the resource it
+covers, are defined by an authorization profile: a
+separate specification with a persistent identifier of its own, listed in
+[[[#authorization-profiles]]].
 
-### PWS Authorization Profile v0.1 {#pws-authorization-profile-v0-1}
+### Authorization Profiles {#authorization-profiles}
 
-Like many authorization specifications, the PWS Authorization Profile tries
-to address opposing tensions. On the one hand, to cover the full range of use
-cases, it needs to be delegatable, revocable, secure, flexible, and thus
- capability-based. On the other hand, for ease of implementation and adoption,
-and for maximum developer usability, the profile must make the most common
-operations as simple and friction-free as possible.
+A [=server=] MUST implement at least one authorization profile listed in the
+table below. It MUST list every profile it implements in the
+[=service description=]'s `specs` member, under the profile's identifier (see
+[[[#service-description-data-model]]]). The members of a profile's
+[=version entry=] are defined by the profile.
 
-To that end, the profile offers the following layered mechanisms.
+| Profile                                                                                             | Identifier                            | Status   |
+|-----------------------------------------------------------------------------------------------------|---------------------------------------|----------|
+| PWS Authorization Profile [[PWS-AUTHZ]]: zCaps over HTTP Signatures, with the `PublicCanRead` policy | `https://w3id.org/pws/authz-profile`  | Baseline |
 
-1. **Root Access**: For basic admin CRUD operations, use the space's `controller`
-   DID directly to sign API calls with HTTP Signatures.
-2. **Public Read**: For the common "public read" use case (the typical web
-   publishing workflow, where a site or a file is shared for anyone to access
-   via an HTTP GET), use the simple `{ "type": "PublicCanRead" }` PWS
-   Authorization syntax, see below.
-3. **Advanced Delegatable Capabilities** ("anyone with the link..." style):
-   Use zCaps [Authorization Capabilities v0.3](https://w3c-ccg.github.io/zcap-spec/)
-4. **Policy Based Access Control** (including the familiar "share with this list
-   of people or groups" style): Use the space's `linkset` property to point to
-   a linkset that includes a URL to an access control policy document.
+The PWS Authorization Profile [[PWS-AUTHZ]] is the baseline. A server
+conformant to the Minimal profile of [[[#scope-and-conformance-profiles]]]
+MUST implement it, so that the Minimal profile is implementable from this
+document and [[PWS-AUTHZ]] alone. A server MAY implement further profiles.
+Registering a profile adds a row to this table.
 
-#### Authorization Specification Dependencies at a Glance {#authorization-specification-dependencies-at-a-glance}
+Every authorization profile meets the following contract:
 
-The initial PWS Authorization Profile uses the following specifications.
+* **Private by default.** Absent a [=policy=] that grants otherwise, only the
+  Space's [=controller=], or a party the controller has authorized through
+  the profile, may perform any operation on the Space or on anything in it.
+  Reads are authorized just as writes are.
+* **The Space `controller` is the root of trust.** Every authorized operation
+  traces back to the Space's `controller`, see
+  [[[#space-controller-and-the-root-of-trust]]].
+* **Actions and targets.** A profile defines how a credential names the
+  operation a request performs and the resource it acts on. The baseline
+  names them by the uppercase HTTP method and the full request URL (see
+  [Capability Invocation](https://w3c-ccg.github.io/wallet-attached-storage-spec/authz-profile/#capability-invocation) in [[PWS-AUTHZ]]), the
+  same terms this specification's own operation sections use.
+* **Policies broaden, and only broaden.** A profile consults the effective
+  [=policy=] only after any credential the request carries, under the
+  evaluation contract of [[[#access-control-policies]]].
+* **Maximum privacy.** A request that lacks sufficient privilege for an
+  existing target is answered as if the target did not exist, see
+  [[[#error-handling]]]. A profile reports its failures with the kinds of
+  [[[#error-type-registry]]].
 
-1. Identity (for controllers or clients/agents): [DID 1.0](https://www.w3.org/TR/did-1.0/)
-2. Capability data model: [Authorization Capabilities for Linked Data v0.3](https://w3c-ccg.github.io/zcap-spec/)
-3. Protocol for getting authorization: Out of scope (implementers are encouraged
-   to use VC-API, OpenId4VP, OAuth2, or GNAP, as appropriate)
-4. Proof of Possession / authorization invocation: HTTP Signatures.
-   MUST - [HTTP Signatures (Cavage draft 12)](https://datatracker.ietf.org/doc/html/draft-cavage-http-signatures),
-   MAY - [[RFC9421]] HTTP Message Signatures (a future direction for this
-   profile, see the note below)
-5. Request body integrity: the `Digest` header, bound to the request
-   signature -- see [[[#request-body-integrity-digest-header]]]
-6. Access Control / Policy language data model: see
-   [[[#access-control-policies]]] (`PublicCanRead` is the only normative type for
-   v0.1)
+### Space `controller` and the Root of Trust {#space-controller-and-the-root-of-trust}
 
-<div class="ednote">
-**Signature suite (transitional).** The signature suite of this profile is
-the Cavage HTTP Signatures draft (draft 12). The covered-headers list uses
-its pseudo-headers (`(key-id)`, `(created)`, `(expires)`,
-`(request-target)`), and the worked examples carry an
-`Authorization: Signature ...` header in its syntax. This matches every
-current implementation. [[RFC9421]] HTTP Message Signatures (the
-`Signature` and `Signature-Input` headers) is a future direction for this
-profile. It will be adopted as a coordinated migration across the
-implementations, together with the `Content-Digest` migration described in
-[[[#request-body-integrity-digest-header]]].
-</div>
-
-#### Space `controller` and the Root of Trust {#space-controller-and-the-root-of-trust}
-
-Conceptually, the space's controller serves as the root of trust and authorization
-for any operations on the space or its collections or resources.
+Conceptually, the space's controller serves as the root of trust and
+authorization for any operations on the space or its collections or resources.
 That is, any operation requiring an authorization MUST provide a chain of proof
-all the way to the space controller, by one of the following:
-
-1. Direct: Provide a root capability invoked directly by the controller, or
-2. Delegated: Invoke a capability delegated to some other agent by the controller, or
-3. Matching Policy: (if using any kind of access control policy mechanism) Match
-   an authorization policy specified in the `linkset` property of the space. This
-   resource is related to the space controller because initially, it can only be
-   modified either by the controller or an authorized party delegated to by the
-   controller.
+all the way to the space controller. The forms that proof takes (a credential
+the controller signs directly, one the controller delegated to another agent,
+or a matching access control policy) are defined by the authorization profile;
+for the baseline, see the
+[Root of Trust](https://w3c-ccg.github.io/wallet-attached-storage-spec/authz-profile/#space-controller-and-the-root-of-trust) section of
+[[PWS-AUTHZ]].
 
 Space `controller`s MUST be in the form of a [DID](https://www.w3.org/TR/did-1.0/).
 
@@ -652,31 +638,7 @@ whose DID method it does not support with [=invalid-request-body=] (400),
 whether at creation or on an update (see [[[#create-space-errors]]] and
 [[[#update-or-create-by-id-space-operation]]]).
 
-##### Current-key-set rule {#current-key-set-rule}
-
-Whatever the DID method, the key material that verifies an invocation or a
-delegation is the signer's DID document as resolved at the time of
-verification. A signature verifies if and only if its verification method is
-present in that document, under the verification relationship the operation
-requires: `capabilityInvocation` for an invocation, `capabilityDelegation` for
-a delegation. A `did:key` document never changes. A document of a method with
-a mutable, verifiable history (see [[[#verified-log-did-methods]]]) changes
-as that history is extended, so the set of accepted keys is the current one.
-A delegation signed by a key that has since been removed from the delegator's
-document stops verifying the moment that verification method leaves the
-document, even though the capability itself was not revoked. Every capability
-delegated onward from it stops verifying with it. Removing a key from a
-controller's document is therefore an immediate, server-enforced withdrawal
-of everything that key delegated, independent of any capability revocation
-mechanism.
-
-This rule applies to every DID that signs in a capability chain, not only to
-the Space's `controller`. A capability rooted in a `did:key`-controlled Space
-MAY be delegated to a DID of any method the server supports; the server
-resolves that delegate's document the same way when it verifies the
-delegate's invocation or onward delegation.
-
-##### Setting a controller to an optional DID method {#setting-a-controller-to-optional-did-method}
+#### Setting a controller to an optional DID method {#setting-a-controller-to-optional-did-method}
 
 A server that supports an optional DID method decides at which point it
 admits a `controller` of that method. It MAY accept one at Space creation. It
@@ -692,236 +654,20 @@ document being resolved, so storing an unresolvable DID (a typo, a history
 not yet published) would leave the Space with no party able to act on it.
 
 When a space is created via an HTTP `POST` or `PUT` operation (see
-[[[#http-api-post-spaces]]] and [[[#http-api-put-space-space_id]]]), the
-controller for that space
-is set explicitly. That is, a client specifies the `controller` as part of the
-payload of the PUT or POST create space request, and the server MUST verify
-that the invocation is authorized by that `controller`, by one of the first two
-mechanisms above: either directly -- the signing key (key ID) used in the
-headers is authorized in the `capabilityInvocation` section of the
-`controller`'s DID document -- or via a capability delegated by the
-`controller` to the signing DID. (The third mechanism, matching policy, does
-not apply: no Space, and therefore no policy, exists yet.)
+[[[#http-api-post-spaces]]] and [[[#update-or-create-by-id-space-operation]]]), the
+controller for that space is set explicitly. That is, a client specifies the
+`controller` as part of the payload of the PUT or POST create space request,
+and the server MUST verify that the creating request is authorized by that
+`controller`, as the authorization profile defines (for the baseline, see
+[Authorizing Space creation](https://w3c-ccg.github.io/wallet-attached-storage-spec/authz-profile/#authorizing-space-creation) in
+[[PWS-AUTHZ]]). A request that is not is refused with [=controller-mismatch=]
+(400). A matching policy cannot authorize creation: no Space, and therefore no
+policy, exists yet.
 
 See [[[#http-api-post-spaces]]] below for examples of `controller`
 determination and verification.
 
-#### Performing Authorized API Calls {#performing-authorized-api-calls}
-
-Unless otherwise explicitly allowed via access control policy (see below),
-all PWS API calls require authorization.
-
-This can be done in one of two ways:
-
-1. (for admin-like root access) Use the `controller` DID directly to sign
-   HTTP API requests using the HTTP Signatures specification, invoking the
-   target's [=root capability=].
-2. (for advanced delegatable use cases) Use HTTP Signatures in combination
-   with [Authorization Capabilities v0.3](https://w3c-ccg.github.io/zcap-spec/),
-   and include a capability invocation header in the API request.
-
-Throughout this specification, the request examples abbreviate this header as a
-placeholder, `Authorization: ...`, rather than reproducing a full signature or
-capability invocation. In each case it stands for a credential constructed as
-described in [[[#performing-authorized-api-calls]]].
-
-#### Request Body Integrity (Digest Header) {#request-body-integrity-digest-header}
-
-When an authorized request carries a body (a Resource write, a Space create,
-and so on), this profile binds the body to the request's HTTP Signature so
-that the payload cannot be substituted without invalidating the signature:
-
-1. The client MUST include a `Digest` header whose value is the hash of the
-   request body, carried as a `mh` (multihash) parameter: a multibase
-   base64url-encoded (`u` prefix) multihash of the body's SHA-256 digest
-   (Multihash and Multibase as defined in the
-   [CID 1.0 specification](https://www.w3.org/TR/cid-1.0/)). For example:
-
-   ```http
-   Digest: mh=uEiCPO-qYr-z0GYV5F75-N1l8Rhjv4xIkKZsnbTZeZ7emSA
-   ```
-
-2. The `content-type` and `digest` headers MUST be included in the
-   signature's covered (signed) headers list, alongside the Cavage draft-12
-   pseudo-headers `(key-id)`, `(created)`, `(expires)`, and
-   `(request-target)`, and the `host` and `capability-invocation` headers.
-3. For any request that carries a `Content-Type` header, the server MUST
-   require `digest` among the covered headers, and SHOULD independently
-   recompute the digest of the received body and compare it to the `Digest`
-   header value. A missing, malformed, or non-matching `Digest` on a request
-   with a body is rejected with an [=invalid-authorization-header=] (400)
-   error.
-
-Bodyless requests (`GET`, `HEAD`, `DELETE`) carry no `Digest` header.
-
-Example authorized write request, showing the `Digest` header and the
-covered headers list (the space's [=controller=] invoking the
-[=root capability=] for the target; line breaks within the `Authorization`
-header are for display only):
-
-```http
-PUT /space/81246131-69a4-45ab-9bff-9c946b59cf2e/photos/sunset.png HTTP/1.1
-Host: example.com
-Content-Type: image/png
-Digest: mh=uEiCPO-qYr-z0GYV5F75-N1l8Rhjv4xIkKZsnbTZeZ7emSA
-Capability-Invocation: zcap id="urn:zcap:root:https%3A%2F%2Fexample.com%2Fspace%2F81246131-69a4-45ab-9bff-9c946b59cf2e%2Fphotos%2Fsunset.png",action="PUT"
-Authorization: Signature keyId="did:key:z6MkpBMbMaRSv5nsgifRAwEKvHHoiKDMhiAHShTFNmkJNdVW#z6MkpBMbMaRSv5nsgifRAwEKvHHoiKDMhiAHShTFNmkJNdVW",
-  headers="(key-id) (created) (expires) (request-target) host capability-invocation content-type digest",
-  signature="6GoRQ+rW69wBhNyERkafAXEZXZArezHvGRNUWC0HNI4Ss1xAiiMHdayS5aA2R6hLuYRNw6h9J9eCmQVMuHE1Bw==",
-  created="1758150502",expires="1758151102"
-
-...binary PNG bytes...
-```
-
-<div class="ednote">
-**Digest vs Content-Digest.** The `Digest` header used by this profile
-descends from [[RFC3230]] (Instance Digests in HTTP). [[RFC9530]] (Digest
-Fields) obsoletes RFC 3230 and replaces `Digest` with `Content-Digest` /
-`Repr-Digest`. The current PWS implementation stack uses the legacy header
-with a multihash value; migration to `Content-Digest` (alongside the move to
-[[RFC9421]] HTTP Message Signatures, see
-[[[#authorization-specification-dependencies-at-a-glance]]]) is a future
-direction for this profile.
-</div>
-
-#### Authorization Actions and the Root Capability {#authorization-actions-and-the-root-capability}
-
-A capability invocation names an [=action=] that the invoked capability must
-permit. PWS uses the uppercase HTTP method names as its action vocabulary:
-
-* <dfn id="get-action">`GET`</dfn> -- read a Space, Collection, or Resource. A
-  `HEAD` request is authorized as a `GET`.
-* <dfn id="post-action">`POST`</dfn> -- create a child item in a container (add a
-  Resource to a Collection, a Collection to a Space, or a Space to the Spaces
-  Repository).
-* <dfn id="put-action">`PUT`</dfn> -- create-by-id or replace: a Resource at
-  its own URL, or a Space or a Collection through its `meta` sub-resource (see
-  [[[#reading-this-document]]]).
-* <dfn id="delete-action">`DELETE`</dfn> -- delete a Space, Collection, or
-  Resource.
-
-A request is authorized by a capability when all the following hold:
-
-1. the capability's `invocationTarget` matches the request's [=target=] -- the
-   full request URL (scheme, host, port, and path);
-2. the capability's `allowedAction` includes the request's action (the HTTP
-   method); and
-3. the invocation is signed by a key the capability authorizes, carried as a
-   valid HTTP Signature over the request (see
-   [[[#performing-authorized-api-calls]]]).
-
-##### Root Capability {#root-capability}
-
-Every [=target=] has an implied **root capability** whose `controller` is the
-Space's [=controller=]. It is identified by the URI `urn:zcap:root:` followed by
-the percent-encoded target URL:
-
-```json
-{
-  "@context": "https://w3id.org/zcap/v1",
-  "id": "urn:zcap:root:https%3A%2F%2Fexample.com%2Fspace%2F81246131-69a4-45ab-9bff-9c946b59cf2e%2Fmessages%2Fhello-world",
-  "invocationTarget": "https://example.com/space/81246131-69a4-45ab-9bff-9c946b59cf2e/messages/hello-world",
-  "controller": "did:key:z6MkpBMbMaRSv5nsgifRAwEKvHHoiKDMhiAHShTFNmkJNdVW"
-}
-```
-
-The Space [=controller=] MAY invoke the root capability directly -- signing the
-request with a key listed in the `capabilityInvocation` section of the
-controller's DID document -- to perform any operation. This is the "root access"
-path. All other authorized access derives from a capability delegated, directly
-or transitively, from this root.
-
-##### Delegation {#delegation}
-
-To grant another agent access, the [=controller=] (or any agent holding a
-sufficiently broad capability) delegates a capability that names the grantee as
-its new `controller`, the `invocationTarget` to scope it to, and the
-`allowedAction`s to permit. A delegation MAY set an `expires` time. For example,
-granting another DID read-only access to a single Collection:
-
-```json
-{
-  "@context": "https://w3id.org/zcap/v1",
-  "id": "urn:uuid:6c9f3a1e-2b4d-4f8a-9c1e-7d2b3a4c5e6f",
-  "parentCapability": "urn:zcap:root:https%3A%2F%2Fexample.com%2Fspace%2F81246131-69a4-45ab-9bff-9c946b59cf2e%2Fmessages%2F",
-  "invocationTarget": "https://example.com/space/81246131-69a4-45ab-9bff-9c946b59cf2e/messages/",
-  "controller": "did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK",
-  "allowedAction": ["GET"],
-  "expires": "2026-12-31T23:59:59Z",
-  "proof": { "...": "delegation proof signed by the parent capability's controller" }
-}
-```
-
-The delegated capability is handed to the recipient out of band. The recipient
-invokes it by signing a request with their own key and including the capability
-in the `Capability-Invocation` header.
-
-A [=target=] covers everything beneath it, so the choice of target is what
-attenuates a grant. A capability on a Collection URL, as above, covers the
-Collection's listing, every Resource in it, and its Metadata object -- which is
-what "share this collection" means. To grant the Collection's metadata
-alone, without its Resources, target the `meta` URL instead; that grant also
-covers the governing history log beneath it (see
-[[[#collection-governing-history-log]]]). The same holds one level up for a
-Space.
-
-##### The Container Rule {#the-container-rule}
-
-Target attenuation stops working for four operations: `DELETE
-/space/{space_id}/`, `PUT /space/{space_id}/meta` on a Space that already
-exists, `DELETE /space/{space_id}/{collection_id}/`, and `PUT
-/space/{space_id}/{collection_id}/meta`. A capability delegated at a
-container's `invocationTarget` -- the Space URL or the Collection URL --
-covers everything beneath it, including its data, so nothing about that
-target tells apart "delete this container" from "delete a Resource inside
-it". These four operations therefore MUST be authorized by a root
-capability invoked directly by the Space's [=controller=]. A delegated
-capability MUST NOT authorize any of them, with exactly two exceptions.
-
-1. **Delete Space.** A delegated capability MAY authorize `DELETE
-   /space/{space_id}/`, for a Space of any controller DID method, when the
-   invoked capability's `invocationTarget` is exactly that Space's URL and
-   its `allowedAction` is exactly `['DELETE']`. The shape is judged on the
-   invoked capability itself: a parent capability further up its
-   delegation chain MAY carry a broader `allowedAction` set, as long as the
-   invoked capability narrows it to exactly `['DELETE']` on exactly the
-   Space URL. Such a capability is not a data grant -- an `allowedAction`
-   of `['DELETE']` alone cannot be used to read or write anything beneath
-   the Space -- so it does not carry the hazard the rule otherwise guards
-   against.
-
-2. **Update (or Create by Id) Collection.** A delegated capability MAY
-   authorize `PUT /space/{space_id}/{collection_id}/meta` when the
-   invoked capability's `invocationTarget` is the Space's own canonical
-   (trailing-slash) URL, rather than the Collection container URL, the
-   Collection Metadata URL, or a Resource URL. A Space-level
-   grant is not a Collection-level data grant, so it does not reopen the
-   hazard either.
-
-Both exceptions are judged on the shape of the capability alone -- its
-`invocationTarget` and `allowedAction` -- independent of who signed it. A
-server MUST NOT treat a capability as satisfying either exception because
-of the verification relationship its signing key holds in a DID document
-(for example, membership in a `capabilityDelegation` set); only the
-capability's own shape, and the [=root capability=] its chain derives
-from, decide whether an exception applies.
-
-Creating a Collection (`POST /space/{space_id}/`) is unaffected by this
-rule: it remains an ordinary attenuated operation, and a delegated
-capability targeting the Space MAY authorize it, like any other create
-by `POST`.
-
-<div class="ednote">
-**Revocation.** This specification does not yet define a revocation
-operation, although its goals require that a grant can be withdrawn before it
-expires. The current PWS implementation stack ships a Space-scoped revocation
-endpoint (`POST /space/{space_id}/zcaps/revocations/{revocation_id}`; every
-Space-rooted capability verification checks the presented delegation chain
-against the recorded revocations). A future revision will specify the
-operation and reserve its path segments.
-</div>
-
-#### Specifying Access Policy With Space Link Sets
+### Specifying Access Policy With Space Link Sets
 
 To set access control policy for a space, use the `linkset` property.
 
@@ -970,7 +716,7 @@ Content-type: application/json
 { "type": "PublicCanRead" }
 ```
 
-#### Access Control Policies {#access-control-policies}
+### Access Control Policies {#access-control-policies}
 
 Capabilities answer the question "does the caller hold a credential that grants
 this action?" Access control *policies* answer the complementary question
@@ -991,30 +737,24 @@ and [[[#collection-linkset]]]).
   fallback, and it can only **broaden** access -- a policy never denies a caller
   who presents a valid capability.
 * **Fail-closed.** An absent policy, or a policy whose `type` an implementation
-  does not recognize, grants nothing.
+  does not recognize, grants nothing. The recognized types are those of
+  [[[#policy-type-registry]]].
 * **Most-specific-wins inheritance.** The effective policy for a target is the
   one set at the most specific level that has a policy document: a Resource
   policy overrides a Collection policy, which overrides a Space policy.
-* **Access kind.** For policy evaluation, the request action is reduced to a
-  coarse access kind: [=GET=] (and `HEAD`) is a `read`; [=POST=], [=PUT=], and
-  [=DELETE=] are a `write`.
+* **Access kind.** For policy evaluation, the request method is reduced to a
+  coarse access kind: `GET` (and `HEAD`) is a `read`; `POST`, `PUT`, and
+  `DELETE` are a `write`.
 
-##### `PublicCanRead`
+#### Policy Types {#policy-types}
 
 Policy `type` values are defined by policy profiles, in the same way that
 authorization is defined by an authorization profile. This specification does
-not fix the set. The one type this version defines is `PublicCanRead`:
-
-```json
-{ "type": "PublicCanRead" }
-```
-
-It grants the `read` access kind to any caller (including unauthenticated ones)
-and grants no write access. This is the canonical "public read" pattern -- for
-example, hosting an HTML file or an image that anyone may `GET`, while writes
-still require a capability. Setting it on a Space makes the whole Space
-public-readable (subject to any more specific Collection or Resource policy);
-setting it on a single Resource exposes only that Resource.
+not fix the set. The registered types, each with the specification that
+defines it, are listed in [[[#policy-type-registry]]]. An implementation
+recognizes a `type` by looking it up there, and a `type` not listed grants
+nothing. The baseline profile [[PWS-AUTHZ]] defines `PublicCanRead`, the
+first registered type.
 
 ## Error Handling {#error-handling}
 
@@ -1337,19 +1077,15 @@ specification does not enumerate them.
   it does not recognize, and MUST treat an absent token (or an absent array)
   as "not supported". The tokens are those of the profile table in
   [[[#scope-and-conformance-profiles]]].
-* `signatureAlgorithms` (optional) - An array of the signature algorithms the
-  server accepts on capability invocations (see
-  [[[#performing-authorized-api-calls]]]), named by their JSON Web Algorithms
-  [[RFC7518]] identifiers, so `EdDSA` [[RFC8037]] for Ed25519.
-* `zcapCryptosuites` (optional) - An array of the Data Integrity cryptosuite
-  names the server accepts on capability delegation proofs, such as
-  `eddsa-jcs-2022`.
 
-<div class="ednote">
-The authorization profile ([[[#pws-authorization-profile-v0-1]]]) does not yet
-catalogue which values of these two members it requires; the examples below
-use the values the reference implementations exchange today.
-</div>
+**An authorization profile's version entry.** A server lists every
+authorization profile it implements under the profile's own identifier (see
+[[[#authorization-profiles]]]), and the profile defines its entry's members.
+The baseline profile's entry, under `https://w3id.org/pws/authz-profile`,
+carries the signature algorithms and delegation-proof cryptosuites the server
+accepts; see the
+[Service Description Entry](https://w3c-ccg.github.io/wallet-attached-storage-spec/authz-profile/#service-description-entry) section of
+[[PWS-AUTHZ]]. The example below shows one.
 
 ### Instance Disclosure {#instance-disclosure}
 
@@ -1441,9 +1177,7 @@ Link: <https://example.com/pws/service>; rel="service"
         "url": "https://w3c-ccg.github.io/wallet-attached-storage-spec/v0.5/",
         "spaces": "https://example.com/pws/spaces/",
         "features": ["listing", "collection-management", "space-management",
-                     "linksets", "policy", "backends", "quotas"],
-        "signatureAlgorithms": ["EdDSA"],
-        "zcapCryptosuites": ["eddsa-jcs-2022"]
+                     "linksets", "policy", "backends", "quotas"]
       },
       {
         "version": "0.4",
@@ -1451,6 +1185,14 @@ Link: <https://example.com/pws/service>; rel="service"
         "spaces": "https://example.com/pws/spaces/",
         "features": ["listing", "collection-management", "space-management",
                      "linksets", "policy", "backends", "quotas"]
+      }
+    ],
+    "https://w3id.org/pws/authz-profile": [
+      {
+        "version": "0.1",
+        "url": "https://w3c-ccg.github.io/wallet-attached-storage-spec/authz-profile/",
+        "signatureAlgorithms": ["EdDSA"],
+        "zcapCryptosuites": ["eddsa-jcs-2022"]
       }
     ],
     "https://w3id.org/encrypted-collections": [
@@ -1479,6 +1221,9 @@ a [=server=] and applies these rules:
   understands, the server is incompatible and the client MUST stop rather than
   guess a layout. The same applies to a document that is not valid JSON, or
   that lacks `url` or `specs`.
+* If no entry names an authorization profile the client implements (see
+  [[[#authorization-profiles]]]), the server is likewise incompatible: the
+  client has no way to sign a request the server would accept.
 * A response with no `service` link means v0.4 (see
   [[[#discovering-the-service-description]]]).
 
@@ -1544,7 +1289,8 @@ To create a Space:
   * The capability invocation MUST be *authorized by* the body's `controller`:
     either signed directly by the `controller` DID (the common case), or signed
     by another DID presenting a valid, unexpired delegation chain rooted in the
-    `controller` (see [[[#delegation]]]). This is how the root of trust is
+    `controller` (see [Delegation](https://w3c-ccg.github.io/wallet-attached-storage-spec/authz-profile/#delegation) in [[PWS-AUTHZ]]). This is
+    how the root of trust is
     initially set up (see [[[#space-controller-and-the-root-of-trust]]] for
     more details).
   * The delegated form supports creating a Space *on behalf of* its eventual
@@ -2028,7 +1774,7 @@ Errors (see [[[#error-type-registry]]] for canonical examples):
 * Requires appropriate authorization
   - For example, when using [=zCaps=] for authorization, the request must be
     signed by the space's [=controller=], or invoke a delegated capability that
-    allows the [=GET=] action
+    allows the `GET` action
 * Since Collection's `name` property is optional, default it to be the same
   value as `id` when `name` is missing. (The name is intended to drive UIs, so
   defaulting to `id` simplifies consuming client logic.)
@@ -2037,7 +1783,7 @@ Errors (see [[[#error-type-registry]]] for canonical examples):
   [[[#collection-metadata-data-model]]]). A server MAY additionally surface a
   `public` member on each item: a boolean indicating
   whether a `PublicCanRead` access control policy (see
-  [[[#access-control-policies]]]) is attached to that Collection. It is surfaced
+  [[[#policy-type-registry]]]) is attached to that Collection. It is surfaced
   inline so that a listing consumer need not issue one policy probe per item to
   learn whether the Collection is publicly readable. A server that surfaces
   `public` MUST include it on *every* item in the listing, expressing `false`
@@ -2535,7 +2281,7 @@ Errors (see [[[#error-type-registry]]] for canonical examples):
 * Requires appropriate authorization
   - For example, when using [=zCaps=] for authorization, the request must be
     signed by the space's [=controller=], or invoke a delegated capability that
-    allows the [=GET=] action
+    allows the `GET` action
 * The response includes an `ETag` header over the object's `metaVersion`, for
   use with `If-Match` on a subsequent update (see [[[#conditional-requests]]]);
   a request carrying an `If-None-Match` that covers it is answered
@@ -2725,7 +2471,7 @@ Errors (see [[[#error-type-registry]]] for canonical examples):
 * Requires appropriate authorization
   - For example, when using [=zCaps=] for authorization, the request must be
     signed by the space's [=controller=], or invoke a delegated capability that
-    allows the [=GET=] action
+    allows the `GET` action
 * MAY be paginated (see [[[#pagination]]]); the example below shows a single
   unpaginated page, and the paginated example that follows shows the `next` link
   and cursor continuation.
@@ -2940,7 +2686,7 @@ Authorization follows the Collection. The log is readable under any
 capability whose `invocationTarget` covers the Collection URL, so a share
 grantee or an app reads it with the capability it already holds; a read is
 also served where the Collection's access-control [=policy=] grants reads. A
-write requires a capability that allows the [=PUT=] action at the log's URL;
+write requires a capability that allows the `PUT` action at the log's URL;
 a policy grants no writes to it. As everywhere in this specification, a
 caller that is not authorized receives the merged [=not-found=] (404), per
 [[[#error-handling]]].
@@ -3058,7 +2804,7 @@ that is specific to encryption; a later governed member adds its own.
 * Requires appropriate authorization
   - For example, when using [=zCaps=] for authorization, the request must
     either: be signed by the space's [=controller=], or invoke a delegated
-    capability that allows the [=GET=] action whose target covers the
+    capability that allows the `GET` action whose target covers the
     Collection URL
 * Returns the log body verbatim, as `text/jsonl`, with an `ETag` header over
   the log's version (see [[[#governing-log-versioning]]])
@@ -3122,7 +2868,7 @@ verifying reader detects under the governing profile.
 * Requires appropriate authorization
   - For example, when using [=zCaps=] for authorization, the request must
     either: be signed by the space's [=controller=], or invoke a delegated
-    capability that allows the [=PUT=] action whose target covers the log's
+    capability that allows the `PUT` action whose target covers the log's
     URL
 * The request body is the whole log as `text/jsonl`
 * Carries `If-None-Match: *` (guarded create, the declaration) or
@@ -3376,7 +3122,7 @@ and `Accept` header handling (including the `HEAD` variant).
   - For example, when using [=zCaps=] for
     authorization, the request must either: be signed by the resource's or the
     space's [=controller=], or invoke a delegated capability that allows the
-    [=GET=] action
+    `GET` action
 
 Example request to retrieve a resource:
 
@@ -3414,7 +3160,7 @@ of the Resource. This Resource `id` MUST NOT collide with the list of
   - For example, when using [=zCaps=] for
     authorization, the request must either: be signed by the resource's or the
     space's [=controller=], or invoke a delegated capability that allows the
-    [=PUT=] action
+    `PUT` action
 * This operation is idempotent
 * Returns a `204` success response
 
@@ -3463,8 +3209,9 @@ HTTP/1.1 204 No Content
 Example request (uploading a binary Blob via PUT; the bytes are stored
 verbatim under the supplied content type, see
 [[[#content-types-and-representations]]]). The `Digest` header binds the
-body to the request signature when using the PWS Authorization Profile (see
-[[[#request-body-integrity-digest-header]]]):
+body to the request signature under the baseline authorization profile (see
+[Request Body Integrity](https://w3c-ccg.github.io/wallet-attached-storage-spec/authz-profile/#request-body-integrity-digest-header) in
+[[PWS-AUTHZ]]):
 
 ```http
 PUT /space/81246131-69a4-45ab-9bff-9c946b59cf2e/photos/sunset.png HTTP/1.1
@@ -3516,7 +3263,7 @@ described in [[[#conditional-requests]]].
   - For example, when using [=zCaps=] for authorization, the request
     must either: be signed by the resource's or the space's [=controller=],
     or invoke a delegated capability that allows the
-    [=DELETE=] action
+    `DELETE` action
 
 * This operation is idempotent
 
@@ -3744,7 +3491,7 @@ never declares one.
   - For example, when using [=zCaps=] for
     authorization, the request must either: be signed by the resource's or the
     space's [=controller=], or invoke a delegated capability that allows the
-    [=GET=] action
+    `GET` action
 
 Example request:
 
@@ -3819,7 +3566,7 @@ returns a [=not-found=] (404) error.
   - For example, when using [=zCaps=] for
     authorization, the request must either: be signed by the resource's or the
     space's [=controller=], or invoke a delegated capability that allows the
-    [=PUT=] action
+    `PUT` action
 * This operation is idempotent
 * Returns a `204` success response
 
@@ -3917,7 +3664,7 @@ one URL.
 * Requires appropriate authorization
   - For example, when using [=zCaps=] for authorization, the request must
     either: be signed by the space's [=controller=], or invoke a delegated
-    capability that allows the [=PUT=] action, whose `invocationTarget` is the
+    capability that allows the `PUT` action, whose `invocationTarget` is the
     chunk's own full URL (see [[[#chunk-authorization]]]).
 * Upserts the chunk at `{index}`: a write replaces any chunk already stored
   there. Indexes need not be written contiguously or in order.
@@ -3930,9 +3677,9 @@ scheme's envelope validation applies to a Resource's own content, **not** to its
 chunks, because the chunks of an encrypted stream are ciphertext fragments, not
 envelope documents. The parent Resource MUST already exist; a `PUT` to a chunk
 of a Resource that does not exist is rejected with [=not-found=] (`404`), so a
-chunk can never be orphaned. The `Digest` request-body-integrity requirement
-(see [[[#request-body-integrity-digest-header]]]) applies per request -- that
-is, per chunk. The backend's `maxUploadBytes` cap and quota accounting apply to
+chunk can never be orphaned. The authorization profile's request-body
+integrity requirement (for the baseline, the `Digest` header of
+[[PWS-AUTHZ]]) applies per request -- that is, per chunk. The backend's `maxUploadBytes` cap and quota accounting apply to
 a chunk write exactly as they do to a Resource write (see [[[#quotas]]]).
 
 Each chunk carries its own strong `ETag` validator, independent of the parent
@@ -4143,7 +3890,7 @@ capability-only, while reads (`GET`, `HEAD`, and the container listing) are
 capability-or-policy. A chunk write's capability `invocationTarget` MUST be the
 chunk's own full URL (member form), and the listing's the `chunks/` container
 URL -- the same exact-match target rule that governs every PWS URL (see
-[=target=]). For a read, the governing access-control [=policy=] is the parent
+target). For a read, the governing access-control [=policy=] is the parent
 Resource's: a chunk exposes a fragment of the same content the Resource holds, so
 whoever may read the Resource may read its chunks, and the maximum-privacy
 [=not-found=] rule (see [[[#error-handling]]]) applies to a chunk exactly as to
@@ -4499,10 +4246,9 @@ Each entry in the `backends` array carries:
   `isUnlimited` is `true`, `capacityBytes` MAY be omitted).
 * `constraints` (optional) - operational constraints such as
   `maxUploadBytes`, the largest single upload the backend accepts.
-* `restrictedActions` - an array of [=actions=] (uppercase HTTP verbs, the
-  same vocabulary as the PWS Authorization Profile, see
-  [[[#authorization-actions-and-the-root-capability]]]) currently unavailable
-  on this backend. For example, a full backend reports `["POST", "PUT"]`
+* `restrictedActions` - an array of uppercase HTTP method names (`GET`,
+  `POST`, `PUT`, `DELETE`, the action vocabulary of [[PWS-AUTHZ]]) currently
+  unavailable on this backend. For example, a full backend reports `["POST", "PUT"]`
   while still permitting reads and deletes.
 * `measuredAt` - when the usage numbers were measured. For `external`
   ("Bring Your Own Storage") backends, the server proxies the provider's
@@ -4687,15 +4433,15 @@ only ever observed by a caller already authorized to list that target; an
 under-authorized caller receives the merged [=not-found=] (`404`) instead, per
 [[[#error-handling]]].
 
-### Pagination parameters and authorization
+### Pagination parameters and authorization {#pagination-parameters-and-authorization}
 
-A capability authorizes a list [=target=] independent of which page is being
+A capability authorizes a list target independent of which page is being
 read: a capability that authorizes listing a Space, Collection, or Spaces
 Repository authorizes retrieval of *every* page of that list. The `limit` and
 `cursor` parameters select a page within an already-authorized target; they do
-not narrow, widen, or otherwise change the [=target=] a capability must match
-(see [[[#root-capability]]]). A server MUST NOT require a distinct capability per
-page.
+not narrow, widen, or otherwise change the target a capability must match
+(see [Capability Invocation](https://w3c-ccg.github.io/wallet-attached-storage-spec/authz-profile/#capability-invocation) in [[PWS-AUTHZ]]). A
+server MUST NOT require a distinct capability per page.
 
 </section>
 
@@ -4710,11 +4456,13 @@ that does support a registered method MUST follow that method's profile here.
 </div>
 
 This registry lists the DID methods a Space `controller` (and, by the
-[[[#current-key-set-rule]]], any DID signing in a capability chain) may use,
-and the verification a [=server=] performs for each. See
-[[[#space-controller-and-the-root-of-trust]]] for the method-neutral rules:
-the current-key-set rule, refusal of unsupported methods, and the
-resolve-before-store rule for a proposed controller.
+[current-key-set rule](https://w3c-ccg.github.io/wallet-attached-storage-spec/authz-profile/#current-key-set-rule) of [[PWS-AUTHZ]], any DID
+signing in a capability chain) may use, and the verification a [=server=]
+performs for each. See [[[#space-controller-and-the-root-of-trust]]] for the
+method-neutral rules: refusal of unsupported methods and the
+resolve-before-store rule for a proposed controller. The current-key-set rule,
+which makes the resolved document the set of accepted keys, is the
+authorization profile's.
 
 | Method                                                   | Support  | Kind         | Self-hosted history layout                                  | Profile                                   |
 |----------------------------------------------------------|----------|--------------|-------------------------------------------------------------|-------------------------------------------|
@@ -4799,6 +4547,25 @@ log as the method's specification defines: the SCID is checked against the
 log's first entry, the hash chain of entries is verified, pre-rotation
 commitments (`nextKeyHashes`) are enforced, and each entry's proof is
 verified against the update keys authorized by the entry before it.
+
+</section>
+
+<section class="appendix normative">
+
+## Policy Type Registry {#policy-type-registry}
+
+This appendix is normative.
+
+This registry lists the `type` values an access control [=policy=] may carry
+(see [[[#access-control-policies]]]) and the specification that defines each
+one. A [=server=] evaluates a policy by looking its `type` up here. A `type`
+not in this registry is unrecognized and grants nothing, per the fail-closed
+rule. Registering a type adds a row naming the specification that defines
+it; this specification defines no policy type itself.
+
+| `type`          | Grants                                                                                 | Defined by     |
+|-----------------|----------------------------------------------------------------------------------------|----------------|
+| `PublicCanRead` | the `read` access kind to any caller, including unauthenticated ones; no write access | [[PWS-AUTHZ]] |
 
 </section>
 
@@ -4941,7 +4708,7 @@ structure, so this enforcement neither requires nor weakens confidentiality.
 
 A [=server=] that recognizes the `scheme`/`version` pair declared by a
 Collection's `encryption` descriptor MUST validate the body of every Resource
-content write ([=POST=] or [=PUT=]) into that Collection against that pair's
+content write (`POST` or `PUT`) into that Collection against that pair's
 envelope profile, and MUST reject a non-conforming body -- or a body sent under a
 `Content-Type` other than the scheme's registered media type -- with an
 [=encryption-scheme-mismatch=] error.
@@ -5250,7 +5017,7 @@ A reader must know which epoch key to unwrap before attempting decryption.
 The writer therefore declares the epoch a Resource was encrypted under, and the
 server stores and serves that declaration:
 
-* A Resource content write ([=POST=] or [=PUT=]) MAY carry a `Key-Epoch`
+* A Resource content write (`POST` or `PUT`) MAY carry a `Key-Epoch`
   request header whose value is the epoch `id` (a non-empty string; a present
   but empty or malformed value is an [=invalid-request-body=] error). The
   server MUST store the value verbatim as the Resource Metadata `epoch`
@@ -5401,10 +5168,11 @@ treat a `profile` it does not recognize the same as one it does not serve, with
 [=unsupported-operation=].
 
 **Authorization.** The query endpoint requires read authorization (a capability
-or a [=policy=] grant, as for any read); the invoked [=action=] is [=POST=]. The
-capability's [=invocationTarget=] is the bare `/query` URL. Every query parameter
-travels in the request body, which is signed and covered by the request `Digest`
-(see [[[#request-body-integrity-digest-header]]]), so no query-string
+or a [=policy=] grant, as for any read); the invoked action is `POST`. The
+capability's `invocationTarget` is the bare `/query` URL. Every query parameter
+travels in the request body, which is signed and covered by the authorization
+profile's body-integrity mechanism (the request `Digest` of [[PWS-AUTHZ]]), so
+no query-string
 attenuation is involved, and a capability that authorizes the `/query` target
 authorizes any query body it signs. As with every other operation, a server MUST
 verify authorization before validating the request body. An under-authorized
@@ -5882,6 +5650,12 @@ short human-readable summary in `title`.
 Each `type` URI is a fragment anchor into this registry. The status codes
 listed below are typical; a single kind MAY be returned with more than one
 status code depending on the operation.
+
+An authorization profile registers no kinds of its own. It reports its
+failures with the kinds here: [=missing-authorization=],
+[=invalid-authorization-header=], [=controller-mismatch=], and, under the
+maximum-privacy rule of [[[#error-handling]]], [=not-found=]. The baseline
+profile [[PWS-AUTHZ]] lists which it emits when.
 
 | `type` URI                                                  | Anchor                                                                      | Typical status | Description                                                                                                                                                                                                                                                                                                                                                                                                      |
 |-------------------------------------------------------------|-----------------------------------------------------------------------------|----------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
