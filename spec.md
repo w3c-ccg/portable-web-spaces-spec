@@ -109,6 +109,10 @@ This subsection is non-normative.
     The `signatureAlgorithms` and `zcapCryptosuites` members moved from this
     specification's [=version entry=] to the profile's own entry under
     `https://w3id.org/pws/authz-profile`, which a server now lists.
+  * The Chunked Resources section and the EDV-over-PWS Profile appendix moved
+    to the companion specification [[PWS-EC]], with wire behavior unchanged.
+    Core keeps the `chunks` reserved path segment and the `edv` Encryption
+    Scheme Registry entry's server-visible structural validation.
 
 No stored data moves across the v0.4-to-v0.5 path changes. The durable
 artifacts to audit are capabilities. A delegated capability whose
@@ -230,8 +234,8 @@ familiar to anyone who has used a GUI front end for a database or file system.
 **Multi-tenant** support lets a provider host many Spaces on one server. The
 **Extensions** tier layers on optional features -- an access-policy resource,
 user-writable metadata (for example, "tags" on binary files), a Space export
-endpoint, pluggable [[[#backends]]], query, quotas, and client-side encryption
-(via [Encrypted Data Vaults](https://identity.foundation/edv-spec/)) --
+endpoint, pluggable [[[#backends]]], query, quotas, and the server-side
+validation that the encrypted-collection profile [[PWS-EC]] builds on --
 advertised server-wide in the service description's `features` array and, per
 Space, through the linkset feature-detection mechanism (from [[RFC9264]]; see
 [[[#linksets]]]).
@@ -389,14 +393,11 @@ pre-configured and controlled by the server.
 * `GET /space/{space_id}/{collection_id}/{resource_id}/meta` -- [[[#read-resource-metadata-operation]]]
 * `PUT /space/{space_id}/{collection_id}/{resource_id}/meta` -- [[[#update-resource-metadata-operation]]]
 
-**Chunked Resource Endpoints** (see [[[#chunked-resources]]]; serving them is a
-requirement of [[PWS-EC]] conformance, so a server that does not implement
-[[PWS-EC]] MAY omit them entirely):
-
-* `PUT|GET|HEAD|DELETE /space/{space_id}/{collection_id}/{resource_id}/chunks/{index}`
-  -- store, read, head, delete a single chunk.
-* `GET /space/{space_id}/{collection_id}/{resource_id}/chunks/` -- list a
-  Resource's chunks.
+**Chunked Resource Endpoints:** the reserved `chunks` sub-path under a Resource
+is where [[PWS-EC]] defines its chunk endpoints (store, read, head, delete a
+single chunk, and list a Resource's chunks). A server that does not implement
+[[PWS-EC]] MAY omit them entirely; see the
+[[[#reserved-path-segment-registry]]].
 
 **Policy Related Endpoints:**
 
@@ -449,15 +450,6 @@ Required if Space endpoints or Collection endpoints are supported.
     Collection names one via its <code>backend</code> property, and is assigned
     the <code>default</code> backend when it does not. See section
     [[[#backends]]].</dd>
-
-  <dt><dfn data-lt="chunks">chunk</dfn></dt>
-  <dd>One opaque byte sequence of a chunked Resource, addressed by a
-    non-negative integer index under the Resource's reserved <code>chunks</code>
-    sub-path. The [=server=] stores a chunk exactly like a binary Resource
-    representation and never parses it; framing and reassembly are the client's
-    concern. Serving chunks is a requirement of [[PWS-EC]] conformance; a
-    server that does not implement [[PWS-EC]] MAY omit the chunk endpoints.
-    See section [[[#chunked-resources]]].</dd>
 
   <dt><dfn data-lt="collections">collection</dfn></dt>
   <dd>A namespace and configuration container for resources. Conceptually maps
@@ -3605,297 +3597,6 @@ Errors (see [[[#error-type-registry]]] for canonical examples):
 * [=unsupported-operation=] (501) -- the server does not implement the
   optional metadata endpoints.
 
-## Chunked Resources {#chunked-resources}
-
-<div class="note">
-Chunked Resources are an OPTIONAL feature. Serving the chunk endpoints is a
-requirement of [[PWS-EC]] conformance; a server that does not implement
-[[PWS-EC]] MAY omit these endpoints entirely and remain conformant; see
-[[[#scope-and-conformance-profiles]]].
-</div>
-
-A Resource MAY carry an ordered set of **chunks**: opaque byte sequences, each
-addressed by a non-negative integer index under the Resource's reserved `chunks`
-sub-path. Chunks let a client store a representation larger than a single request
-(or a single encryption envelope) can carry, without the server ever parsing or
-reassembling anything. The server treats each chunk exactly like a binary
-Resource representation -- stored bytes plus a content type (see
-[[[#content-types-and-representations]]]) -- and framing and reassembly
-(including any client-side encryption) are entirely the client's concern. The
-server never concatenates a Resource's chunks, and reading the parent Resource's
-own content (see [[[#read-resource-operation]]]) returns only that content, not
-its chunks; the chunk set is discovered and read through the endpoints below.
-
-Chunks are the substrate the [[[#edv-over-pws-profile-v0-1]]] uses to store a
-large or streamed encrypted document, but the mechanism itself is
-scheme-agnostic: the bytes of a chunk are opaque to the server whether they are
-plaintext, ciphertext, or anything else.
-
-### The chunk address {#the-chunk-address}
-
-A single chunk is addressed in **member form** (no trailing slash), and a
-Resource's chunk set is listed in **container form** (trailing slash), following
-the trailing-slash convention in [[[#reading-this-document]]]:
-
-* `PUT` / `GET` / `HEAD` / `DELETE`
-  `/space/{space_id}/{collection_id}/{resource_id}/chunks/{index}` -- store,
-  read, head, and delete a single chunk.
-* `GET` `/space/{space_id}/{collection_id}/{resource_id}/chunks/` -- list the
-  Resource's chunks.
-
-As elsewhere, a request to the non-canonical variant of either form is
-redirected to the canonical one with `308 Permanent Redirect` (which, unlike a
-`302`, requires the client to replay the same method and body): a `GET` of the
-member-form `chunks` container without its trailing slash redirects to the
-trailing-slash form, and a member `PUT` (or other member method) carrying a
-trailing slash redirects to the no-slash form.
-
-The `{index}` path segment MUST be a canonical non-negative decimal integer: a
-single `0`, or a digit run with no leading zero, no sign, and no non-digit
-characters (so `0`, `1`, `42` are valid; `01`, `+1`, `-1`, `1e3`, `1.0` are
-not). A server MUST reject a non-canonical index with an [=invalid-id=] (`400`)
-error. Requiring a canonical spelling keeps each chunk addressable at exactly
-one URL.
-
-### Store Chunk Operation {#store-chunk-operation}
-
-#### (HTTP API) PUT `/space/{space_id}/{collection_id}/{resource_id}/chunks/{index}`
-
-* Requires appropriate authorization
-  - For example, when using [=zCaps=] for authorization, the request must
-    either: be signed by the space's [=controller=], or invoke a delegated
-    capability that allows the `PUT` action, whose `invocationTarget` is the
-    chunk's own full URL (see [[[#chunk-authorization]]]).
-* Upserts the chunk at `{index}`: a write replaces any chunk already stored
-  there. Indexes need not be written contiguously or in order.
-* Returns a `204` success response carrying the chunk's `ETag`.
-
-The request body is raw bytes under any `Content-Type`. The server MUST NOT
-parse or validate a chunk body. This holds even for a Collection that declares
-an `encryption` descriptor (see [[[#encryption-scheme-registry]]]): the
-scheme's envelope validation applies to a Resource's own content, **not** to its
-chunks, because the chunks of an encrypted stream are ciphertext fragments, not
-envelope documents. The parent Resource MUST already exist; a `PUT` to a chunk
-of a Resource that does not exist is rejected with [=not-found=] (`404`), so a
-chunk can never be orphaned. The authorization profile's request-body
-integrity requirement (for the baseline, the `Digest` header of
-[[PWS-AUTHZ]]) applies per request -- that is, per chunk. The backend's `maxUploadBytes` cap and quota accounting apply to
-a chunk write exactly as they do to a Resource write (see [[[#quotas]]]).
-
-Each chunk carries its own strong `ETag` validator, independent of the parent
-Resource's and of the other chunks'. The `If-Match` / `If-None-Match` write
-preconditions of [[[#conditional-requests]]] apply per chunk, against that
-validator.
-
-Example request (storing chunk `0` as raw bytes):
-
-```http
-PUT /space/81246131-69a4-45ab-9bff-9c946b59cf2e/backups/bigfile/chunks/0 HTTP/1.1
-Host: example.com
-Content-Type: application/octet-stream
-Digest: mh=uEiCPO-qYr-z0GYV5F75-N1l8Rhjv4xIkKZsnbTZeZ7emSA
-Authorization: ...
-
-...raw chunk bytes...
-```
-
-Example success response:
-
-```http
-HTTP/1.1 204 No Content
-ETag: "1"
-```
-
-Errors (see [[[#error-type-registry]]] for canonical examples):
-
-* [=invalid-id=] (400) -- the `{index}` segment is not a canonical non-negative
-  decimal integer (see [[[#the-chunk-address]]]).
-* [=not-found=] (404) -- the parent Resource (or its enclosing Space or
-  Collection) does not exist, or the caller has missing or insufficient
-  authorization; per [[[#error-handling]]] an under-authorized request is
-  indistinguishable from a missing target.
-* [=payload-too-large=] (413) -- the chunk exceeds the backend's `maxUploadBytes`
-  constraint (see [[[#quotas]]]).
-* [=quota-exceeded=] (507) -- the Collection's backend has no storage quota
-  remaining (see [[[#quotas]]]).
-* [=precondition-failed=] (412) -- a conditional write's `If-Match` /
-  `If-None-Match` precondition evaluated false against the chunk's own `ETag`
-  (see [[[#conditional-requests]]]).
-
-### Read Chunk Operation {#read-chunk-operation}
-
-#### (HTTP API) GET `/space/{space_id}/{collection_id}/{resource_id}/chunks/{index}`
-
-A read returns the chunk's stored bytes, verbatim, with the content type they
-were stored under, and the chunk's `ETag`. A `HEAD` on the same address returns
-those same headers -- the response `Content-Type` and `Content-Length` are read
-from the chunk's stored metadata, so the byte stream is never opened -- with no
-body, mirroring the Resource `HEAD` variant in
-[[[#content-types-and-representations]]]. Authorization for a chunk read (and
-`HEAD`) is capability-or-policy and resolves at the parent Resource's access
-level (see [[[#chunk-authorization]]]).
-
-Example request:
-
-```http
-GET /space/81246131-69a4-45ab-9bff-9c946b59cf2e/backups/bigfile/chunks/0 HTTP/1.1
-Host: example.com
-Authorization: ...
-```
-
-Example success response:
-
-```http
-HTTP/1.1 200 OK
-Content-Type: application/octet-stream
-ETag: "1"
-
-...raw chunk bytes...
-```
-
-Errors (see [[[#error-type-registry]]] for canonical examples):
-
-* [=invalid-id=] (400) -- the `{index}` segment is not canonical (see
-  [[[#the-chunk-address]]]).
-* [=not-found=] (404) -- no chunk is stored at `{index}` (the parent Resource may
-  exist but have no chunk there), or the caller has missing or insufficient
-  authorization; per [[[#error-handling]]] the two are indistinguishable.
-
-### Delete Chunk Operation {#delete-chunk-operation}
-
-#### (HTTP API) DELETE `/space/{space_id}/{collection_id}/{resource_id}/chunks/{index}`
-
-* Requires appropriate authorization on the same terms as the Store Chunk
-  operation (capability-only against the chunk's own URL; see
-  [[[#chunk-authorization]]]).
-* Removes the chunk at `{index}` and returns a `204` success response.
-* Accepts the `If-Match` precondition of [[[#conditional-requests]]] against the
-  chunk's own `ETag`.
-
-Unlike the [[[#delete-resource-operation]]], deleting a chunk is **not**
-idempotent: a `DELETE` of an absent chunk is rejected with [=not-found=]
-(`404`), not a `204`. This is deliberate -- a client reassembling a chunked
-representation must be able to distinguish a chunk that is *gone* from one that
-was *never written*, which an idempotent delete would erase.
-
-Example request:
-
-```http
-DELETE /space/81246131-69a4-45ab-9bff-9c946b59cf2e/backups/bigfile/chunks/0 HTTP/1.1
-Host: example.com
-Authorization: ...
-```
-
-Example success response:
-
-```http
-HTTP/1.1 204 No Content
-```
-
-Errors (see [[[#error-type-registry]]] for canonical examples):
-
-* [=invalid-id=] (400) -- the `{index}` segment is not canonical.
-* [=not-found=] (404) -- no chunk is stored at `{index}` (see above), or the
-  caller has missing or insufficient authorization; per [[[#error-handling]]] the
-  two are indistinguishable.
-* [=precondition-failed=] (412) -- an `If-Match` precondition evaluated false
-  against the chunk's `ETag`.
-
-### List Chunks Operation {#list-chunks-operation}
-
-#### (HTTP API) GET `/space/{space_id}/{collection_id}/{resource_id}/chunks/`
-
-The container form lists a Resource's stored chunks. Because the server never
-reassembles a chunked Resource, this listing is the discovery mechanism: a
-reader learns the chunk set here -- how many chunks exist and each one's index,
-size, and content type -- and then reads indexes `0` through `count - 1` itself.
-Authorization is capability-or-policy against the `chunks/` container URL,
-resolving at the parent Resource's access level (see [[[#chunk-authorization]]]).
-
-The response is an `application/json` object:
-
-* `resourceId` -- the parent Resource's id.
-* `count` -- the number of stored chunks.
-* `chunks` -- an array, in ascending `index` order, of one entry per stored
-  chunk:
-  * `index` -- the chunk's non-negative integer index.
-  * `size` -- the length in bytes of the stored chunk.
-  * `contentType` -- the content type the chunk was stored under.
-  * `version` (optional) -- the chunk's monotonic version, the integer from
-    which its strong `ETag` is derived (the `ETag` is this integer, quoted).
-    Present when the server derives the chunk's `ETag` from an internal
-    version counter; absent when it derives the `ETag` some other way, such
-    as a content hash (see [[[#conditional-requests]]]).
-
-The parent Resource MUST exist for its chunk container to: a listing under an
-absent Resource is a [=not-found=] (`404`). A Resource that exists but has no
-chunks lists as `count` `0` with an empty `chunks` array.
-
-Example request:
-
-```http
-GET /space/81246131-69a4-45ab-9bff-9c946b59cf2e/backups/bigfile/chunks/ HTTP/1.1
-Host: example.com
-Accept: application/json
-Authorization: ...
-```
-
-Example success response:
-
-```http
-HTTP/1.1 200 OK
-Content-Type: application/json
-
-{
-  "resourceId": "bigfile",
-  "count": 3,
-  "chunks": [
-    { "index": 0, "size": 1048576, "contentType": "application/octet-stream", "version": 1 },
-    { "index": 1, "size": 1048576, "contentType": "application/octet-stream", "version": 1 },
-    { "index": 2, "size": 524288, "contentType": "application/octet-stream", "version": 1 }
-  ]
-}
-```
-
-Errors (see [[[#error-type-registry]]] for canonical examples):
-
-* [=not-found=] (404) -- the parent Resource does not exist, or the caller has
-  missing or insufficient authorization; per [[[#error-handling]]] the two are
-  indistinguishable.
-
-### Chunk lifecycle {#chunk-lifecycle}
-
-A Resource's chunks are bound to the Resource. Deleting the parent Resource (see
-[[[#delete-resource-operation]]]) MUST cascade-delete all of its chunks; there is
-no way to leave chunks behind a deleted Resource. A Resource's chunks are carried
-alongside its content by a Space export and restored by the matching import (the
-`export` reserved segment; see [[[#reserved-path-segment-registry]]]).
-
-Chunk writes and deletes are invisible to the `changes` query profile (see
-[[[#query-profile-changes]]]): storing or deleting a chunk affects only the
-chunk's own `ETag` validator and MUST NOT advance the parent Resource's
-position in the feed, and the feed enumerates Resources only, never chunks. A
-client replicating a chunked Resource MUST therefore finish the write by
-updating the parent Resource's own content (its manifest; see
-[[[#update-or-create-by-id-resource-operation]]]) after its chunks are stored:
-that final Resource write is what surfaces the change to replicating readers.
-A client that mutates a Resource purely through its chunks never appears on
-the feed.
-
-### Chunk authorization {#chunk-authorization}
-
-Chunk operations use the same authorization model as every other operation in
-this specification (see [[[#authorization]]]): writes (`PUT`, `DELETE`) are
-capability-only, while reads (`GET`, `HEAD`, and the container listing) are
-capability-or-policy. A chunk write's capability `invocationTarget` MUST be the
-chunk's own full URL (member form), and the listing's the `chunks/` container
-URL -- the same exact-match target rule that governs every PWS URL (see
-target). For a read, the governing access-control [=policy=] is the parent
-Resource's: a chunk exposes a fragment of the same content the Resource holds, so
-whoever may read the Resource may read its chunks, and the maximum-privacy
-[=not-found=] rule (see [[[#error-handling]]]) applies to a chunk exactly as to
-the Resource.
-
 ## Linksets {#linksets}
 
 <div class="note">
@@ -4626,7 +4327,7 @@ level operations.
 | Reserved API Endpoint                                  | Reserved segment | Purpose                                              |
 |--------------------------------------------------------|------------------|------------------------------------------------------|
 | `/space/{space_id}/{collection_id}/{resource_id}/meta`   | `meta`           | Resource metadata (server-managed and user-writable) |
-| `/space/{space_id}/{collection_id}/{resource_id}/chunks` | `chunks`         | Chunk addressing for a chunked Resource (see [[[#chunked-resources]]]) |
+| `/space/{space_id}/{collection_id}/{resource_id}/chunks` | `chunks`         | Chunk addressing for a chunked Resource; owned by [[PWS-EC]], which defines the chunk endpoints under this segment. The segment stays reserved on every server whether or not it implements [[PWS-EC]]. |
 
 Unlike the Space- and Collection-level reserved segments, which occupy the id
 position one level down and so constrain Collection and Resource id choice,
@@ -4703,6 +4404,11 @@ structure, so this enforcement neither requires nor weakens confidentiality.
 | `scheme` | `version` | Media type         | Envelope profile                                                                                                                                                                                                                                                                                                                          | Reference                                                      |
 |----------|-----------|--------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------|
 | `edv`    | `1`       | `application/json` | An [Encrypted Data Vault](https://identity.foundation/edv-spec/) **Encrypted Document**: a JSON object whose `jwe` member is a JWE in JSON Serialization ([[RFC7516]] §7.2) -- a JSON object carrying at least a `ciphertext` member and either a `recipients` array (general serialization) or a top-level `encrypted_key`/`protected` (flattened serialization). The document MAY also carry EDV bookkeeping members (`id`, `sequence`, `indexed`); these are opaque to the server. | [Encrypted Data Vaults](https://identity.foundation/edv-spec/) |
+
+[[PWS-EC]] owns the envelope, the blinded index, recipient management, and the
+chunked envelope form built on this scheme. Core keeps only the server-visible
+structural validation below: the shape a server checks on write, independent
+of what a client does with the plaintext.
 
 ### Server-side write validation
 
@@ -5050,89 +4756,22 @@ reader walking a listing
 
 <div class="informative">
 
-The reference construction (implemented by `@interop/was-client` and
-normatively specified in [[PWS-EC]]); other constructions are conformant at
-this specification's level so long as stored envelopes keep satisfying the
-[`edv` envelope profile](#encryption-scheme-registry):
-
-* **A collection's metadata carries its epoch roster from creation.** The
-  first epoch is installed at provision time by a
-  [create-if-absent](#conditional-requests) write
-  (an existing roster, including a concurrent provisioner's is adopted,
-  not overwritten), before the collection's first content write. There is
-  no epoch-less era: a client of this construction refuses fail-closed to
-  build a cipher from an `edv` descriptor without epochs, and never seals
-  an envelope directly to a reader's own key-agreement key.
-* An **epoch key** is a fresh 32-byte secret used as the seed of an X25519
-  key-agreement key pair, freshly generated per epoch. The epoch `id` is the
-  `did:key` identifier of the epoch public key, so any standard `did:key`
-  resolver that supports X25519 type `did:key` DIDs can resolve the JWE
-  recipient `kid` of a stored envelope, and the `kid` itself names the epoch.
-* **Resources are encrypted with a fresh per-resource content encryption key
-  wrapped to the epoch key** (`ECDH-ES+A256KW`, the epoch key pair as the JWE's
-  sole recipient). The stored envelope is the ordinary EDV Encrypted Document
-  shape; only the key resolution process differs from a native EDV. Each
-  envelope additionally binds its epoch into the JWE protected header
-  ([[PWS-EC]]'s `was` binding), checked unconditionally on read.
-* The **descriptor's `recipients` entries wrap the 32-byte epoch secret to each
-  reader's own key-agreement key** with `ECDH-ES+A256KW` (ephemeral-static
-  ECDH, the RFC 7518 Concat KDF, AES key wrap). A reader finds its `kid` in an
-  epoch's `recipients`, unwraps the epoch secret with its own key, and
-  reconstructs the epoch key pair. A failed unwrap is a failure.
-  In particular, key servers whose unwrap operation resolves a null key on
-  mismatch must be handled by trying the next candidate or failing with a
-  typed error.
-* **Reads** use the Resource's [`epoch` stamp](#epoch-stamping-on-resources)
-  (from metadata, the listing
-  item, or the feed document) as advisory pre-fetch routing: it lets a
-  replica select and unwrap the epoch key before fetching the envelope. The
-  authoritative epoch is the envelope's own -- the JWE recipient `kid`
-  names it, and the AEAD-bound epoch binding is verified against the
-  decrypting key ([[PWS-EC]]). An absent stamp therefore just means
-  route-after-fetch; it is never treated as "assume `currentEpoch`", and
-  there are no unstamped pre-epoch resources to tolerate.
-* **Writes** always encrypt under `currentEpoch` and stamp it via
-  `Key-Epoch`.
-* **Adding a reader** wraps EVERY epoch's key to it (adding a reader means it
-  can read the Collection, history included) and writes the updated Metadata
-  object with `If-Match`. No rotation: adds are inexpensive, removals rotate.
-* **Removing a reader** is one indivisible procedure: (1) revoke the reader's
-  capabilities; (2) mint a fresh epoch key, wrap it to each REMAINING
-  recipient, append the epoch, repoint `currentEpoch`, write with `If-Match`;
-  (3) subsequent writes use the new epoch. Client libraries should not expose
-  a rotate-without-revoke or revoke-without-rotate implementation of "remove".
-* On a [=precondition-failed=] response, re-read the Metadata object, re-apply
-  the recipient change to the fresh descriptor, and retry (bounded).
+The client-side epoch construction -- how an epoch key is generated, how
+`recipients` entries wrap it, how reads and writes select an epoch, and how a
+reader is added or removed -- is normatively specified in [[PWS-EC]]. This
+section defines only what the server stores and validates.
 
 </div>
 
 #### Security considerations
 
-* **Limitations.** Rotation protects Resources written after the
-  rotation, and nothing else. It cannot somehow delete the data a removed reader
-  already downloaded; Resources still stored under an earlier epoch remain
-  readable to a removed reader that obtains their ciphertext (a backup, a
-  colluding reader, a feed pull made before revocation); and it provides no
-  post-compromise security for the removed reader's past traffic. Closing
-  those gaps requires re-encrypting the Collection under the new epoch, which is
-  a client-side bulk rewrite, out of scope here. Specifications and libraries
-  documenting removal MUST state this limitation rather than implying stronger
-  guarantees.
-* **Pull and read stay separate.** The capability governs pull
-  (server-enforced, immediate); the epoch key governs read (mathematics,
-  prospective). Documentation and error messages should never conflate them.
-* **The [blinding key](#blinding-key-member) does not rotate with the
-  epoch.** Rotating the `hmac` reference on removal would invalidate every
-  blinded index in the Collection, which is why the server treats the member
-  as permanent (see [[[#blinding-key-member]]] and
-  [[[#key-epoch-server-validation]]]). A removed reader retaining the ability
-  to compute blinded index terms is harmless: the server gates the
-  `blinded-index` query profile (see [[[#query-profile-blinded-index]]])
-  behind a capability the reader no longer holds.
-* **A rotation emits no [`changes` feed](#query-profile-changes) entry.** A rekey is a Collection
-  Description change, not a Resource change. A replicating reader that
-  encounters an `epoch` it does not know MUST re-read the Collection
-  Description.
+<div class="informative">
+
+The security properties and limitations of key-epoch rotation (what
+revocation does and does not protect, and how a rekey interacts with the
+`changes` feed) are discussed in [[PWS-EC]].
+
+</div>
 
 </section>
 
@@ -5306,7 +4945,10 @@ loop of a replication protocol. A metadata-only edit re-surfaces the Resource
 with a bumped `updatedAt` and `metaVersion` but an unchanged `version` and `data`.
 
 **Scope.** Binary (non-JSON) Resources are excluded from the `changes` feed; blob
-replication is out of scope for this profile.
+replication is out of scope for this profile. This also means a write or
+delete of a chunk (see [[PWS-EC]] for what a chunk is) is invisible to the
+feed: it affects only the chunk's own `ETag` validator and MUST NOT advance
+the parent Resource's position in the feed.
 
 Example -- request the first batch and receive one changed document plus the
 checkpoint to resume from:
@@ -5462,173 +5104,6 @@ existence-revealing `409` is observable only to a caller already authorized to
 write; an under-authorized caller receives the merged [=not-found=] instead. The
 check MUST be atomic with the write, so that two concurrent writers cannot both
 claim the same triple.
-
-</section>
-
-<section class="appendix">
-
-## EDV-over-PWS Profile v0.1 {#edv-over-pws-profile-v0-1}
-
-This appendix is normative for clients that claim conformance to it.
-
-<div class="note">
-This profile is a **client-side layout convention**: it constrains how a client
-maps [Encrypted Data Vault](https://identity.foundation/edv-spec/) (EDV)
-operations onto ordinary PWS operations. A
-conforming PWS server needs nothing beyond the features it already advertises,
-and never learns that it is hosting an EDV. Its normative requirements therefore
-bind the *client*; a server's obligations are only the ones it already has for
-the underlying PWS operations.
-</div>
-
-### Purpose {#edv-over-pws-purpose}
-
-An Encrypted Data Vault stores JWE-encrypted documents that its server can query
-by blinded index but never decrypt. A client can realize all of that behavior on
-a plain PWS server, because a PWS Resource is an opaque byte store and
-PWS already carries the pieces an EDV needs. This profile fixes the mapping so
-that independent clients interoperate over the same encrypted Collection:
-
-| EDV concept           | PWS realization                                                                    |
-|-----------------------|------------------------------------------------------------------------------------|
-| Vault                 | [=collection=]                                                                     |
-| Document              | Resource (the EDV envelope stored as its content)                                  |
-| Document `sequence`   | conditional writes (`If-Match` / `If-None-Match`; see [[[#conditional-requests]]]) |
-| Blinded index + query | the `blinded-index` query profile (see [[[#query-profile-blinded-index]]])         |
-| Stream chunks         | chunk addressing (see [[[#chunked-resources]]])                                    |
-
-Encryption itself is out of scope of the server entirely: the client holds all
-keys and performs all encryption, decryption, and index blinding, as required by
-[[[#stored-data-is-opaque-to-the-storage-provider]]]. The server enforces PWS
-authorization, maximum-privacy `404`s, and policies over the ciphertext
-unchanged; the encryption is defense in depth layered on top, not a replacement
-for the PWS authorization model.
-
-### The encryption descriptor {#edv-over-pws-descriptor}
-
-A Collection realizing this profile declares the `encryption` descriptor
-`{ "scheme": "edv", "version": 1 }` in its Collection Metadata object (see
-[[[#collection-metadata-data-model]]]; a bare `{ "scheme": "edv" }` is
-equivalent, since
-an absent `version` means `1`). The wire `version` is the integer registry key
-of the envelope format, distinct from this appendix's own "v0.1" maturity
-label. The `edv` scheme's envelope wire format and the
-server's structural fail-closed validation of it are defined by the
-[[[#encryption-scheme-registry]]] and are not restated here. A server that
-recognizes the `edv` scheme thereby guarantees, without holding any key, that a
-plaintext write into the Collection is rejected -- so the profile inherits the
-registry's fail-closed property for free.
-
-Key management -- how the JWE's recipient keys are chosen, distributed, rotated,
-or organized into epochs for multi-recipient sharing -- is deliberately outside
-the scope of both this profile and this specification, exactly as it is for a
-native EDV: those keys live in the client, and the server sees only opaque
-envelopes. Multi-recipient encryption is carried either directly, in the JWE
-`recipients` structure the [[[#encryption-scheme-registry]]] describes, or
-through the key-epoch indirection of [[[#key-epochs]]], whose public
-bookkeeping (the descriptor's `epochs` roster and the Resource `epoch` stamp)
-the server stores and serves without interpreting; the client-side epoch
-construction is specified in [[PWS-EC]].
-
-### Document layout {#edv-over-pws-document-layout}
-
-A client stores each EDV document as the EDV Encrypted Document envelope -- the
-JSON object `{ id, sequence, indexed?, jwe }` -- as the Resource's content, at
-the Resource id equal to the EDV document id. The envelope is the `edv` scheme's
-registered wire format (see [[[#encryption-scheme-registry]]]); a client SHOULD
-write it under the JWE JSON Serialization media type `application/jose+json`
-([[RFC7516]]) where the server registers a parser for it, and MAY fall back to
-`application/json`, which an unmodified PWS server accepts. The plaintext type of
-the resource, and any user-visible metadata, ride *inside* the JWE and are never
-server-visible; the server stores one opaque envelope regardless of what the
-decrypted document is.
-
-### Sequence mapping {#edv-over-pws-sequence}
-
-EDV gives every document a monotonic `sequence` and enforces `previous + 1`
-atomically server-side. This profile maps that onto PWS conditional writes (see
-[[[#conditional-requests]]]):
-
-* A fresh insert is a `PUT` carrying `If-None-Match: *`, so a collision with an
-  existing document surfaces as [=precondition-failed=] (`412`) rather than a
-  silent overwrite.
-* An update pre-reads the stored envelope, advances `sequence` to `previous + 1`,
-  and writes it back with `If-Match` pinned to the `ETag` observed on that read,
-  so a concurrent writer's stale update is a `412` rather than a lost update.
-
-Both preconditions are honored on any conformant PWS server, since conditional
-writes are a baseline server requirement (see [[[#conditional-requests]]]).
-
-### Chunked streams {#edv-over-pws-chunked-streams}
-
-A large or streamed EDV document is stored as chunks, using PWS chunk
-addressing (see [[[#chunked-resources]]]) against a server that implements
-[[PWS-EC]]:
-
-1. The client writes the document envelope **first**, as an ordinary Resource
-   (satisfying the [[[#store-chunk-operation]]] rule that the parent Resource must
-   exist before any of its chunks). The envelope carries `stream` metadata --
-   `{ sequence, chunks }`, where `chunks` is the total chunk count -- so a reader
-   can learn the extent of the stream from the document alone.
-2. For each chunk `i` in `0 .. chunks - 1`, the client serializes the EDV chunk
-   object `{ index, offset, sequence, jwe }` to JSON and `PUT`s it to chunk index
-   `i` under the `application/octet-stream` content type. The octet-stream type is
-   deliberate: it routes the chunk through the server's raw-binary write path,
-   which is bounded by the backend's `maxUploadBytes` (tens of MiB) rather than
-   the much smaller body-size limit servers typically impose on JSON-parsed
-   requests (the reference server's is 1 MiB), which a full encrypted chunk
-   would exceed. The server stores the bytes verbatim and never parses them, so
-   a reader decodes and parses the chunk object back client-side.
-3. A reader fetches the document envelope, reads `stream.chunks`, fetches chunk
-   indexes `0 .. chunks - 1` (see [[[#read-chunk-operation]]]), and decrypts each
-   `jwe` client-side to reassemble the stream.
-
-<div class="note">
-**Security consideration (stream integrity).** The chunk framing above
-authenticates the *bytes* of each chunk (each `jwe` is an AEAD ciphertext) but
-does **not** authenticate a chunk's *position* in the stream or the stream's
-*total length*: the index, offset, and count are carried in plaintext framing and
-in the (individually authenticated but not cross-linked) chunk objects. A
-malicious server that reorders, drops, duplicates, or truncates chunks is
-therefore **not** reliably detectable by the client with this framing. A hardened
-framing -- a per-stream authenticated header, an index-bound AAD on each chunk,
-and an authenticated total length, in the manner of a Cryptomator-style file
-header -- closes this gap and is planned upstream in the EDV specification. When
-it lands, this profile will adopt it under a new scheme `version`; until
-then, a deployment that does not trust its storage provider for availability and
-ordering integrity SHOULD treat streamed documents accordingly.
-</div>
-
-### Search and uniqueness {#edv-over-pws-search}
-
-Content search over encrypted documents uses the `blinded-index` query profile
-(see [[[#query-profile-blinded-index]]]): a client attaches blinded (HMAC'd)
-`indexed` attributes to the envelope and queries them via
-`POST /space/{space_id}/{collection_id}/query`. Blinded-attribute uniqueness
-(`unique: true`) is enforced server-side by that profile (see
-[[[#query-profile-blinded-index]]], *Unique blinded attributes*). Both require
-a server whose PWS-EC version entry advertises `blinded-index-query` (see
-[[[#service-description-data-model]]]); a client SHOULD gate their use on it.
-
-### What this profile does not provide {#edv-over-pws-limits}
-
-Relative to a dedicated EDV server, this profile reaches full parity for the
-affordances a given server advertises, and has these limitations otherwise:
-
-* **Server-side blinded-index query** and **`unique: true` enforcement**
-  require a server whose PWS-EC version entry advertises
-  `blinded-index-query`. Without it, a client cannot query blinded attributes
-  at the server or rely on it to enforce uniqueness; it must fetch-and-filter
-  client-side (or, as the reference codec does, mint restrict-mode document ids
-  and keep all searchable metadata inside the envelope), and a uniqueness
-  constraint is at best a racy client-side read-then-write.
-* **Stream ordering / truncation integrity** is not authenticated by the current
-  chunk framing (see the security consideration in
-  [[[#edv-over-pws-chunked-streams]]]).
-
-For a small single-writer Collection (for example, a credential wallet) these
-limitations rarely matter; a large or multi-writer Collection wants a server
-that advertises the blinded-index affordance above.
 
 </section>
 
