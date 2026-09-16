@@ -269,9 +269,8 @@ that the payload cannot be substituted without invalidating the signature:
 
 Bodyless requests (`GET`, `HEAD`, `DELETE`) carry no `Digest` header.
 
-The requirement applies per request. A chunk write (see
-[Chunked Resources](https://w3c-ccg.github.io/wallet-attached-storage-spec/#chunked-resources)
-in [[PWS]]) therefore carries a `Digest` of that chunk, and a query request
+The requirement applies per request. A chunk write (the chunk endpoints
+defined by [[PWS-EC]]) therefore carries a `Digest` of that chunk, and a query request
 (see the [Query Profile Registry](https://w3c-ccg.github.io/wallet-attached-storage-spec/#query-profile-registry))
 carries a `Digest` of the query body it signs.
 
