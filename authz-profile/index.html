@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset='utf-8'>
+  <title>Portable Web Spaces Authorization Profile</title>
+  <script src='https://www.w3.org/Tools/respec/respec-w3c' async class='remove'></script>
+  <script class='remove'>
+    // All config options at https://respec.org/docs/
+    var respecConfig = {
+      specStatus: "unofficial",
+      latestVersion: "https://w3c-ccg.github.io/wallet-attached-storage-spec/authz-profile/",
+      editors: [{ name: "Dmitri Zagidulin", url: "https://interopalliance.org" }],
+      github: {
+        branch: "main",
+        repoURL: "https://github.com/w3c-ccg/portable-web-spaces-spec",
+      },
+      includePermalinks: false,
+      xref: ["did-core"],
+      localBiblio: {
+        "PWS": {
+          title: "Portable Web Spaces",
+          href: "https://w3c-ccg.github.io/wallet-attached-storage-spec/",
+          authors: ["Dmitri Zagidulin"],
+          publisher: "W3C Credentials Community Group"
+        },
+        "ZCAP": {
+          title: "Authorization Capabilities for Linked Data v0.3",
+          href: "https://w3c-ccg.github.io/zcap-spec/",
+          publisher: "W3C Credentials Community Group"
+        },
+        "ZCAP-GUIDE": {
+          title: "zCap Developer Guide",
+          href: "https://interop-alliance.github.io/zcap-developer-guide/",
+          authors: ["Dmitri Zagidulin"]
+        },
+        "HTTP-SIGNATURES": {
+          title: "Signing HTTP Messages (draft-cavage-http-signatures-12)",
+          href: "https://datatracker.ietf.org/doc/html/draft-cavage-http-signatures-12",
+          authors: ["M. Cavage", "M. Sporny"],
+          publisher: "IETF (Internet-Draft)"
+        },
+        "DID-KEY": {
+          title: "The did:key Method",
+          href: "https://w3c-ccg.github.io/did-key-spec/",
+          publisher: "W3C Credentials Community Group"
+        },
+        "CID": {
+          title: "Controlled Identifiers v1.0",
+          href: "https://www.w3.org/TR/cid-1.0/",
+          publisher: "W3C"
+        }
+      }
+    };
+    </script>
+</head>
+<body>
+<h1 id="title">Portable Web Spaces Authorization Profile v0.1</h1>
+<section id='abstract'>
+  <p>
+    The baseline authorization profile for Portable Web Spaces: object
+    capabilities (zCaps) invoked over HTTP Signatures, rooted in a Space's
+    controller DID, together with the <code>PublicCanRead</code> access
+    control policy.
+  </p>
+</section>
+<section id="sotd">
+  <p>
+    This is an experimental specification and is undergoing regular revisions.
+    It is a companion to the Portable Web Spaces specification, which defines
+    the storage API this profile authorizes.
+  </p>
+</section>
+
+<section id="conformance">
+  <!-- This section is filled automatically by ReSpec. -->
+</section>
+
+<div data-include="authz-profile.md" data-include-format="markdown" data-include-replace="true"></div>
+
+</body>
+</html>

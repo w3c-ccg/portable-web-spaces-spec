@@ -6,9 +6,11 @@ This is an experimental W3C CCG draft (v0.3), undergoing regular revisions. It i
 
 ## Docs
 
-- [Specification, full text (Markdown source)](https://raw.githubusercontent.com/w3c-ccg/wallet-attached-storage-spec/main/spec.md): The entire normative specification -- data model, HTTP API, error registry, and the PWS Authorization Profile. Read this one if you want everything.
+- [Specification, full text (Markdown source)](https://raw.githubusercontent.com/w3c-ccg/wallet-attached-storage-spec/main/spec.md): The entire core specification -- data model, HTTP API, error registry, and the authorization contract every profile meets. Read this one if you want everything about the storage API.
 - [Specification, rendered](https://w3c-ccg.github.io/wallet-attached-storage-spec/): The same document as static HTML, with section numbering, cross-references, and a table of contents. Requires no JavaScript.
 - [Specification, full text (Markdown source, published)](https://w3c-ccg.github.io/wallet-attached-storage-spec/spec.md): The Markdown source, served from the same origin as the rendered page.
+- [Authorization Profile, full text (Markdown source)](https://w3c-ccg.github.io/wallet-attached-storage-spec/authz-profile/authz-profile.md): The baseline authorization profile -- zCaps over HTTP Signatures, the root capability, delegation, the Digest header, and the `PublicCanRead` policy type. Read this to sign a request.
+- [Authorization Profile, rendered](https://w3c-ccg.github.io/wallet-attached-storage-spec/authz-profile/): The same profile as static HTML.
 
 ## Optional
 
