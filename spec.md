@@ -4274,6 +4274,25 @@ it; this specification defines no policy type itself.
 
 </section>
 
+<section class="appendix normative">
+
+## Policy Type Registry {#policy-type-registry}
+
+This appendix is normative.
+
+This registry lists the `type` values an access control [=policy=] may carry
+(see [[[#access-control-policies]]]) and the specification that defines each
+one. A [=server=] evaluates a policy by looking its `type` up here. A `type`
+not in this registry is unrecognized and grants nothing, per the fail-closed
+rule. Registering a type adds a row naming the specification that defines
+it; this specification defines no policy type itself.
+
+| `type`          | Grants                                                                                 | Defined by     |
+|-----------------|----------------------------------------------------------------------------------------|----------------|
+| `PublicCanRead` | the `read` access kind to any caller, including unauthenticated ones; no write access | [[PWS-AUTHZ]] |
+
+</section>
+
 <section class="appendix">
 
 ## Reserved Path Segment Registry {#reserved-path-segment-registry}

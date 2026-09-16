@@ -11,7 +11,7 @@
 > extensions (linksets, policies, metadata, export, backends, query, quotas) are
 > each optional.
 
-This repository contains the Portable Web Spaces specification (in [ReSpec 
+This repository contains the Portable Web Spaces specification (in [ReSpec
 Markdown](https://respec.org/docs/#markdown) format), and its companion
 [Portable Web Spaces Authorization Profile](https://w3c-ccg.github.io/wallet-attached-storage-spec/authz-profile/)
 (source in [`authz-profile/`](./authz-profile/)), which defines the baseline
@@ -51,8 +51,8 @@ W3C functions under a [code of conduct](https://www.w3.org/Consortium/cepc/).
 ## Contributing
 
 We encourage contributions meeting the
-[Contribution Guidelines](https://github.com/w3c-ccg/community/blob/main/CONTRIBUTING.md). 
-While we prefer the creation of issues and Pull Requests in the GitHub 
+[Contribution Guidelines](https://github.com/w3c-ccg/community/blob/main/CONTRIBUTING.md).
+While we prefer the creation of issues and Pull Requests in the GitHub
 repository, discussions often occur on the
 [public-credentials](http://lists.w3.org/Archives/Public/public-credentials/)
 mailing list as well.
