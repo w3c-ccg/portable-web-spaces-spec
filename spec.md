@@ -1077,6 +1077,13 @@ specification does not enumerate them.
   it does not recognize, and MUST treat an absent token (or an absent array)
   as "not supported". The tokens are those of the profile table in
   [[[#scope-and-conformance-profiles]]].
+* `signatureAlgorithms` (optional) - An array of the signature algorithms the
+  server accepts on capability invocations (see
+  [[[#performing-authorized-api-calls]]]), named by their JSON Web Algorithms
+  [[RFC7518]] identifiers, so `EdDSA` [[RFC8037]] for Ed25519.
+* `zcapCryptosuites` (optional) - An array of the Data Integrity cryptosuite
+  names the server accepts on capability delegation proofs, such as
+  `eddsa-jcs-2022`.
 
 **An authorization profile's version entry.** A server lists every
 authorization profile it implements under the profile's own identifier (see
