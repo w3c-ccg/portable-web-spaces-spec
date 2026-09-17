@@ -34,13 +34,15 @@ jobs:
 
       - name: Assemble site
         run: |
-          mkdir -p _site/live _site/authz-profile/live
+          mkdir -p _site/live _site/authz-profile/live _site/ec/live
           # The live, client-side-rendered ReSpec pages, for editors.
           cp index.html spec.md _site/live/
           cp authz-profile/index.html authz-profile/authz-profile.md _site/authz-profile/live/
+          cp ec/index.html ec/spec.md _site/ec/live/
           # Sources that llms.txt and the specs themselves link to.
           cp spec.md llms.txt _site/
           cp authz-profile/authz-profile.md _site/authz-profile/
+          cp ec/spec.md _site/ec/
 
       - name: Render static snapshot
         # --localhost serves the directory over HTTP so ReSpec's
@@ -69,6 +71,18 @@ jobs:
           --disable-sandbox
           --timeout 60
 
+      - name: Render the Encrypted Collections snapshot
+        # Same arrangement as the authorization profile; published beside
+        # the core spec at /ec/.
+        working-directory: ec
+        run: >
+          npx respec@latest
+          --src index.html
+          --out ../_site/ec/index.html
+          --localhost
+          --disable-sandbox
+          --timeout 60
+
       - name: Verify the snapshots contain the full spec text
         run: |
           for phrase in "maximum privacy" "Authorization Profiles" "Policy Type Registry" "Error Type Registry"; do
@@ -79,8 +93,13 @@ jobs:
             grep -qF "$phrase" _site/authz-profile/index.html \
               || { echo "::error::authz-profile snapshot is missing expected text: $phrase"; exit 1; }
           done
+          for phrase in "The encryption descriptor" "The blinded index" "The resource log profile" "Feature tokens"; do
+            grep -qF "$phrase" _site/ec/index.html \
+              || { echo "::error::ec snapshot is missing expected text: $phrase"; exit 1; }
+          done
           echo "Snapshot: $(wc -c < _site/index.html) bytes"
           echo "Authz profile snapshot: $(wc -c < _site/authz-profile/index.html) bytes"
+          echo "Encrypted Collections snapshot: $(wc -c < _site/ec/index.html) bytes"
 
       - uses: actions/upload-pages-artifact@v5
         with:

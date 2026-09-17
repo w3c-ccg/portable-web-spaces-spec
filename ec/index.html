@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset='utf-8'>
+  <title>Encrypted Collections for Portable Web Spaces</title>
+  <script src='https://www.w3.org/Tools/respec/respec-w3c' async class='remove'></script>
+  <script class='remove'>
+    // All config options at https://respec.org/docs/
+    var respecConfig = {
+      specStatus: "unofficial",
+      latestVersion: "https://w3c-ccg.github.io/wallet-attached-storage-spec/ec/",
+      editors: [{ name: "Dmitri Zagidulin", url: "https://interopalliance.org" }],
+      github: {
+        branch: "main",
+        repoURL: "https://github.com/w3c-ccg/portable-web-spaces-spec",
+      },
+      includePermalinks: false,
+      xref: ["did-core"],
+      localBiblio: {
+        "PWS": {
+          title: "Portable Web Spaces",
+          href: "https://w3c-ccg.github.io/wallet-attached-storage-spec/",
+          authors: ["Dmitri Zagidulin"],
+          publisher: "W3C Credentials Community Group"
+        },
+        "PWS-AUTHZ": {
+          title: "Portable Web Spaces Authorization Profile",
+          href: "https://w3id.org/pws/authz-profile",
+          authors: ["Dmitri Zagidulin"],
+          publisher: "W3C Credentials Community Group"
+        },
+        "APP-CONNECT": {
+          title: "App Connect for Portable Web Spaces",
+          href: "https://interop-alliance.github.io/app-connect-spec/",
+          authors: ["Dmitri Zagidulin"],
+          publisher: "W3C Credentials Community Group (proposed work item)"
+        },
+        "DID-KEY": {
+          title: "The did:key Method",
+          href: "https://w3c-ccg.github.io/did-key-spec/",
+          publisher: "W3C Credentials Community Group"
+        },
+        "DID-WEBVH": {
+          title: "The did:webvh DID Method",
+          href: "https://identity.foundation/didwebvh/",
+          publisher: "Decentralized Identity Foundation"
+        },
+        "JSON-LINES": {
+          title: "JSON Lines",
+          href: "https://jsonlines.org/",
+          authors: ["Ian Ward"]
+        },
+        "EDV": {
+          title: "Encrypted Data Vaults",
+          href: "https://identity.foundation/edv-spec/",
+          publisher: "Decentralized Identity Foundation"
+        },
+        "XCHACHA": {
+          title: "XChaCha: eXtended-nonce ChaCha and AEAD_XChaCha20_Poly1305",
+          href: "https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-xchacha-03",
+          authors: ["S. Arciszewski"],
+          publisher: "IETF (Internet-Draft)"
+        },
+        "BASE58": {
+          title: "The Base58 Encoding Scheme",
+          href: "https://datatracker.ietf.org/doc/html/draft-msporny-base58-03",
+          authors: ["M. Sporny"],
+          publisher: "IETF (Internet-Draft)"
+        }
+      }
+    };
+    </script>
+</head>
+<body>
+<h1 id="title">Encrypted Collections for Portable Web Spaces v0.1</h1>
+<section id='abstract'>
+  <p>
+    A client-side profile defining end-to-end encrypted Collections over
+    Portable Web Spaces (PWS): the encryption descriptor with its
+    key-epoch roster, carried from the collection's creation; the Encrypted
+    Data Vault envelope format with its AEAD-bound <code>pws</code> integrity
+    binding; epoch-configuration authentication; recipient management by
+    escrow and rotate-first removal; the blinded index for equality
+    queries over encrypted content; the deferred-minting rules for
+    local-first writers; and the resource log profile, the hash-linked,
+    externally authorized log form under which descriptors and key
+    rosters are co-managed by a wallet's clients. The storage server needs nothing beyond PWS and
+    never holds key material.
+  </p>
+</section>
+<section id="sotd">
+  <p>
+    This is an experimental specification and is undergoing regular revisions.
+  </p>
+</section>
+
+<section id="conformance">
+  <!-- The normative-language boilerplate is filled automatically by ReSpec. -->
+  <p>
+    Most of this profile binds clients: writers and readers of encrypted
+    collections. The exception is
+    <a href="#chunked-resources">Chunked resources</a>, which defines an HTTP
+    surface. A server that implements this profile serves the chunk
+    endpoints, and a server that does not implement this profile MAY omit
+    them.
+  </p>
+  <p>
+    A server declares which profiles it implements in its PWS service
+    description. A version entry listed under this profile's identifier,
+    <code>https://w3id.org/pws/encrypted-collections</code>, claims
+    conformance to the chunk endpoints at that version; the two feature
+    tokens such an entry may carry claim the optional affordances of
+    <a href="#feature-tokens">Feature tokens</a>. Everything else this
+    profile defines is client-side, so a server lists no entry for it and
+    still stores an encrypted collection's envelopes.
+  </p>
+</section>
+
+<div data-include="spec.md" data-include-format="markdown" data-include-replace="true"></div>
+
+</body>
+</html>

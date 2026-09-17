@@ -15,7 +15,10 @@ This repository contains the Portable Web Spaces specification (in [ReSpec
 Markdown](https://respec.org/docs/#markdown) format), and its companion
 [Portable Web Spaces Authorization Profile](https://w3c-ccg.github.io/wallet-attached-storage-spec/authz-profile/)
 (source in [`authz-profile/`](./authz-profile/)), which defines the baseline
-zCap authorization profile and the `PublicCanRead` policy type.
+zCap authorization profile and the `PublicCanRead` policy type, and
+[Encrypted Collections for Portable Web Spaces](https://w3c-ccg.github.io/wallet-attached-storage-spec/ec/)
+(source in [`ec/`](./ec/)), the client-side profile for end-to-end encrypted
+Collections.
 
 For LLM consumption, [`llms.txt`](llms.txt) summarizes the spec and links to its
 full text, following the [llmstxt.org](https://llmstxt.org/) convention.
@@ -69,6 +72,8 @@ The specification source is in [`spec.md`](./spec.md), in
 [ReSpec Markdown](https://respec.org/docs/#markdown) format. The authorization
 profile's source is [`authz-profile/authz-profile.md`](./authz-profile/authz-profile.md),
 with its own ReSpec shell at [`authz-profile/index.html`](./authz-profile/index.html).
+The Encrypted Collections profile's source is [`ec/spec.md`](./ec/spec.md),
+with its ReSpec shell at [`ec/index.html`](./ec/index.html).
 
 ### Testing
 
@@ -82,8 +87,8 @@ http-server ./
 
 The published site is built by [`.github/workflows/publish.yml`](.github/workflows/publish.yml)
 on every push to `main`, and deployed to GitHub Pages. The workflow runs the
-[ReSpec CLI](https://respec.org/docs/#respec-cli) over `index.html` and
-`authz-profile/index.html` and publishes:
+[ReSpec CLI](https://respec.org/docs/#respec-cli) over `index.html`,
+`authz-profile/index.html`, and `ec/index.html` and publishes:
 
 | Path                              | Contents                                                                                                                             |
 |-----------------------------------|--------------------------------------------------------------------------------------------------------------------------------------|
@@ -94,6 +99,9 @@ on every push to `main`, and deployed to GitHub Pages. The workflow runs the
 | `/authz-profile/`                 | A static snapshot of the Authorization Profile.                                                                                      |
 | `/authz-profile/live/`            | The Authorization Profile's ReSpec page, rendered client-side.                                                                       |
 | `/authz-profile/authz-profile.md` | The Authorization Profile's Markdown source.                                                                                         |
+| `/ec/`                            | A static snapshot of the Encrypted Collections profile.                                                                              |
+| `/ec/live/`                       | The Encrypted Collections profile's ReSpec page, rendered client-side.                                                               |
+| `/ec/spec.md`                     | The Encrypted Collections profile's Markdown source.                                                                                 |
 
 Pull requests build the snapshot as a check but do not deploy it. To render a
 snapshot yourself:
@@ -101,6 +109,7 @@ snapshot yourself:
 ```
 npx respec@latest --src index.html --out snapshot.html --localhost
 (cd authz-profile && npx respec@latest --src index.html --out ../authz-snapshot.html --localhost)
+(cd ec && npx respec@latest --src index.html --out ../ec-snapshot.html --localhost)
 ```
 
 The repository's Pages source must be set to **GitHub Actions** (rather than
