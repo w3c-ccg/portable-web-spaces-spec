@@ -1187,8 +1187,12 @@ Link: <https://example.com/pws/service>; rel="service"
         "zcapCryptosuites": ["eddsa-jcs-2022"]
       }
     ],
-    "https://w3id.org/encrypted-collections": [
-      { "version": "0.2" }
+    "https://w3id.org/pws/encrypted-collections": [
+      {
+        "version": "0.1",
+        "url": "https://w3c-ccg.github.io/wallet-attached-storage-spec/ec/",
+        "features": ["blinded-index-query", "governed-history-logs"]
+      }
     ]
   },
   "instance": {
