@@ -77,6 +77,9 @@ This subsection is non-normative.
     MUST `405` rather than a SHOULD.
   * An update of a Collection's Metadata object that omits `backend` keeps the
     stored backend selection, rather than resetting it to the default.
+  * A Collection's `generator` is now an object with members `id`, `origin`,
+    `url`, and `name`, replacing the flat `generator` and `generatorOrigin` members.
+    An update that omits it keeps the stored value.
   * Create Resource can no longer respond with [=reserved-id=], or with
     [=id-conflict=] for an existing id. The server generates the Resource id
     there, and a client that chooses one uses Update (or Create by Id)
@@ -383,10 +386,27 @@ pre-configured and controlled by the server.
 * `PUT /space/{space_id}/meta` -- [[[#update-or-create-by-id-space-operation]]]
 * `DELETE /space/{space_id}/` -- [[[#delete-space-operation]]]
 * `POST /space/{space_id}/export` -- **Reserved / not yet specified.** Export
-  (download) a Space's contents (all collections and resources).
+  (download) a Space's contents (all collections and resources). When
+  specified, an exported archive carries the exporting server's Service
+  Description (see [[[#service-description]]]) verbatim, as a top-level
+  `service.json` beside the archive's manifest, so that an importer can read
+  the specification version and the feature set the contents were written
+  under before it writes anything.
 * `POST /space/{space_id}/import` -- **Reserved / not yet specified.** Import
   (upload) a previously exported Space archive (the operation the registered
-  [=invalid-import=] error kind anticipates).
+  [=invalid-import=] error kind anticipates). When specified, import MUST
+  restore an archived Space Metadata object's user-writable members (see
+  [[[#space-metadata-data-model]]]) only under an invocation of the Space's
+  root capability, MUST skip them under a delegated chain, and MUST report
+  which of the two it did. It MUST NOT restore server-derived members.
+
+<div class="note">
+The per-Space archive manifest written by the reference implementation names
+section anchors of this document as the specification of its entries, so those
+anchors are stable identifiers: [[[#spaces]]],
+[[[#collection-metadata-data-model]]], [[[#resource-data-model]]],
+[[[#resource-metadata-data-model]]], and [[[#access-control-policies]]].
+</div>
 
 **Advanced Resource Endpoints:**
 
@@ -1529,6 +1549,21 @@ Space properties automatically added by the server:
   a set of links to auxiliary resources (such as to access control policy
   documents). See section [[[#space-linkset]]].
   Note that this is one of the [[[#space-level-reserved-endpoints]]].
+* `backends` (optional) - An array of Backend description objects (see
+  [[[#backend-data-model]]]), the backends the Space serves. It is the same
+  listing as `GET /space/{space_id}/backends` (see
+  [[[#space-backends-available]]]), carried on the Metadata object so that a
+  reader learns it without a second request. It is read-only: a server MUST
+  ignore a `backends` supplied in a request body. A server without pluggable
+  backends (see [[[#backends]]]) omits it.
+
+The Space Metadata object therefore splits in two. Its user-writable members
+are `type` and `name`. Its server-derived members are `createdBy`, `url`,
+`linkset`, and `backends`. `controller` is neither: the creating invocation
+sets it and only the controller rewrites it. That split is the rule an import
+honours: restoring an archived Space Metadata object writes `type` and `name`,
+leaves the server-derived members to the server, and does not touch
+`controller` (see [[[#space-level-reserved-endpoints]]]).
 
 A server that supports conditional writes (see [[[#conditional-requests]]])
 also keeps a server-managed version validator for each Space Metadata object:
@@ -1895,42 +1930,58 @@ Writable properties:
   serialization.
 * `name` (optional) - An arbitrary human-readable name for the collection. Does not
   have to be unique.
-* `generator` (optional) - The [=did=] of the application this collection was
-  provisioned for, named for the ActivityStreams 2.0 `generator` term (the
+* `generator` (optional) - An object naming the application this collection
+  was provisioned for, named for the ActivityStreams 2.0 `generator` term (the
   application that generated an object). It is the client-asserted identity
-  axis of [[[#writer-attribution]]]: client-supplied, persisted, and writable
-  by the Space controller on create and on update -- updatable so that a
-  controller can backfill the property onto collections that predate it --
-  in contrast to the server-observed, read-only `createdBy`. The contrast is
-  the reason the property exists: under delegated provisioning the party
-  whose capability invocation creates the collection is the user's agent (a
-  wallet), so `createdBy` records the user's [=did=], never the
-  application's, and only the controller is in a position to name the
-  application it provisioned the collection for. `generator` is an assertion
-  by the controller, not a server-verified fact: a server MUST NOT verify,
-  compute, or default it, and MUST NOT use it as an input to authorization.
-  A server MAY separately record that the `generator` [=did=] has been
-  observed invoking a delegated capability on the collection -- corroboration
-  on the same evidentiary footing as `createdBy` (server-observed use, not
-  verified identity). Either way, any reader other than the controller (a
-  delegated consumer of a shared collection, a reader of a world-readable
-  one) MUST treat `generator` as exactly a controller assertion. A present
-  but empty or non-[=did=]-shaped value is an [=invalid-request-body=]
-  error.
-* `generatorOrigin` (optional) - The Web origin (its ASCII serialization,
-  e.g. `https://app.example.com`) the `generator` [=did=] was bound to when
-  the collection was provisioned. A provisioning exchange in which the
-  user's agent authenticates the requesting application by origin (for
-  example a browser-attested credential-handler exchange) establishes an
-  origin binding the storage server is never a party to; stamping the origin
-  beside `generator` preserves that fact and gives a reader a human-readable
-  attribution label without further lookups. Same footing as `generator` in
-  every other respect: controller-asserted, writable by the Space controller
-  on create and update, never verified or defaulted by the server. A present
-  value that is not the ASCII serialization of a Web origin (a URL carrying
-  a path, query, or fragment; the empty string) is an
-  [=invalid-request-body=] error. `generatorOrigin` SHOULD NOT be present
-  without `generator`.
+  axis of [[[#writer-attribution]]]. It is client-supplied, persisted, and
+  writable by the Space controller on create and on update, in contrast to
+  the server-observed, read-only `createdBy`. An update that carries
+  `generator` replaces the whole stored object. An update that omits it keeps
+  the stored value, so a controller can backfill the property onto
+  collections that predate it. The contrast with `createdBy` is the reason
+  the property exists. Under delegated provisioning the party whose
+  capability invocation creates the collection is the user's agent (a
+  wallet), so `createdBy` records the user's [=did=] rather than the
+  application's. Only the controller is in a position to name the
+  application it provisioned the collection for. Every member of `generator`
+  is an assertion by the controller, not a server-verified fact. A server
+  MUST NOT verify, compute, or default any member, and MUST NOT use any
+  member as an input to authorization. A present `generator` that is not an
+  object, that lacks `id`, or that carries a member not defined below is an
+  [=invalid-request-body=] error. Its members:
+  * `id` (required when `generator` is present) - The [=did=] of the
+    application. A server MAY separately record that this [=did=] has been
+    observed invoking a delegated capability on the collection. That is
+    corroboration on the same evidentiary footing as `createdBy`
+    (server-observed use, not verified identity). Either way, any reader
+    other than the controller (a delegated consumer of a shared collection,
+    a reader of a world-readable one) MUST treat `id` as exactly a
+    controller assertion. An empty or non-[=did=]-shaped value is an
+    [=invalid-request-body=] error.
+  * `origin` (optional) - The Web origin (its ASCII serialization, e.g.
+    `https://app.example.com`) the `id` [=did=] was bound to when the
+    collection was provisioned. A provisioning exchange in which the user's
+    agent authenticates the requesting application by origin (for example a
+    browser-attested credential-handler exchange) establishes an origin
+    binding the storage server is never a party to. Stamping the origin
+    beside `id` preserves that fact, and gives a reader a human-readable
+    attribution label without further lookups. A present value that is not
+    the ASCII serialization of a Web origin (a URL carrying a path, query,
+    or fragment; the empty string) is an [=invalid-request-body=] error.
+  * `url` (optional) - The application's canonical URL, when the
+    provisioning exchange identified the application by URL rather than by
+    origin alone. Several applications may share one origin, and the origin
+    cannot tell them apart. The URL serves as the same attribution label
+    without further lookups, one level finer than `origin`. When `url` is
+    present, `origin` MUST be present too. The value MUST be an absolute URL
+    with the `http` or `https` scheme, its origin MUST equal `origin`, and
+    it MUST NOT carry a query or a fragment. A value that fails any of these
+    is an [=invalid-request-body=] error.
+  * `name` (optional) - A human-readable display label for the application.
+    It lets a reader show the application by name without further lookups.
+    Like every other member it is the controller's assertion, and a reader
+    MUST NOT treat it as the application's verified identity. A present value
+    that is not a non-empty string is an [=invalid-request-body=] error.
 * `backend` (optional) - An object describing the storage backend selected for
   this collection. If not specified when the Collection is created, defaults to
   the value `{ "id": "default" }`. An update that omits the member keeps the
@@ -2134,8 +2185,12 @@ Example Metadata object of a plaintext Collection (JSON representation):
   "createdAt": "2026-06-10T09:12:00Z",
   "updatedAt": "2026-06-12T13:25:00Z",
   "createdBy": "did:key:z6MkpBMbMaRSv5nsgifRAwEKvHHoiKDMhiAHShTFNmkJNdVW",
-  "generator": "did:key:z6MkfriqYRX3JBqzsbVbKuBUxDR2nsjLTu6AbrxJZAmFmXWb",
-  "generatorOrigin": "https://app.example.com",
+  "generator": {
+    "id": "did:key:z6MkfriqYRX3JBqzsbVbKuBUxDR2nsjLTu6AbrxJZAmFmXWb",
+    "origin": "https://app.example.com",
+    "url": "https://app.example.com/notes/",
+    "name": "Notes"
+  },
   "linkset": "/space/81246131-69a4-45ab-9bff-9c946b59cf2e/73WakrfVbNJBaAmhQtEeDv/linkset",
   "custom": {
     "tags": { "project": "demo" }
@@ -2353,10 +2408,11 @@ stripping. On a Collection whose `encryption` descriptor is governed by its
 history log, the server derives that member from the log's head and refuses a
 direct write of it (see [[[#collection-governing-history-log]]]). An update
 that omits `plaintext` leaves the stored member untouched (see its member
-definition). And an update that omits `backend` MUST keep the stored backend
-selection. Clearing it would repoint the Collection at the default backend. The
-Resources already stored in the selected backend would become unreachable, and
-later writes would land elsewhere. Only a create that omits `backend` is
+definition), and so does an update that omits `generator`. And an update
+that omits `backend` MUST keep the stored backend selection. Clearing it
+would repoint the Collection at the default backend. The Resources already
+stored in the selected backend would become unreachable, and later writes
+would land elsewhere. Only a create that omits `backend` is
 assigned the default.
 
 The request MAY carry a precondition (see [[[#conditional-requests]]]):
@@ -3431,10 +3487,10 @@ neither can substitute for the other:
   is advisory replication metadata, nothing more.
 
 These two leave room for a third, distinct axis: a client-asserted identity
--- a property whose value is a [=did=] the controller writes and maintains
-about another party. The Collection-level `generator` property (see
-[[[#collection-metadata-data-model]]]), naming the application a Collection
-was provisioned for, is this axis. Unlike `writerId` it is an
+-- a [=did=] the controller writes and maintains about another party. The
+Collection-level `generator` property (see
+[[[#collection-metadata-data-model]]]), whose `id` names the application a
+Collection was provisioned for, is this axis. Unlike `writerId` it is an
 identity claim and a stable join key; unlike `createdBy` it is a controller
 assertion rather than a server-verified fact, and a reader treats it as
 exactly that.
@@ -4245,7 +4301,10 @@ the DID `did:webvh:{scid}:{host}:space:{space_id}:{collection_id}` resolves
 from the Resource at `https://{host}/space/{space_id}/{collection_id}/did.jsonl`
 under the method's standard DID-to-HTTPS transformation. The `{collection_id}`
 is any Collection id; PWS Collection ids are restricted to characters the
-method's path encoding leaves untouched, so the mapping is direct.
+method's path encoding leaves untouched, so the mapping is direct. A server
+that accepts `did:webvh` controllers accepts a moved log whose current id is
+self-hosted. The log's earlier entries may name a different host or Space; what
+the server verifies is the log as it stands under its current id.
 
 Verification. Before using the resolved document the server MUST verify the
 log as the method's specification defines: the SCID is checked against the
