@@ -1930,9 +1930,10 @@ Writable properties:
   serialization.
 * `name` (optional) - An arbitrary human-readable name for the collection. Does not
   have to be unique.
-* `generator` (optional) - An object naming the application this collection
-  was provisioned for, named for the ActivityStreams 2.0 `generator` term (the
-  application that generated an object). It is the client-asserted identity
+* `generator` (optional) - An object naming the requester (an app, service,
+  or agent) this collection was provisioned for. It is named for the
+  ActivityStreams 2.0 `generator` term (the party that generated an
+  object). It is the client-asserted identity
   axis of [[[#writer-attribution]]]. It is client-supplied, persisted, and
   writable by the Space controller on create and on update, in contrast to
   the server-observed, read-only `createdBy`. An update that carries
@@ -1942,15 +1943,15 @@ Writable properties:
   the property exists. Under delegated provisioning the party whose
   capability invocation creates the collection is the user's agent (a
   wallet), so `createdBy` records the user's [=did=] rather than the
-  application's. Only the controller is in a position to name the
-  application it provisioned the collection for. Every member of `generator`
+  requester's. Only the controller is in a position to name the requester
+  it provisioned the collection for. Every member of `generator`
   is an assertion by the controller, not a server-verified fact. A server
   MUST NOT verify, compute, or default any member, and MUST NOT use any
   member as an input to authorization. A present `generator` that is not an
   object, that lacks `id`, or that carries a member not defined below is an
   [=invalid-request-body=] error. Its members:
   * `id` (required when `generator` is present) - The [=did=] of the
-    application. A server MAY separately record that this [=did=] has been
+    requester. A server MAY separately record that this [=did=] has been
     observed invoking a delegated capability on the collection. That is
     corroboration on the same evidentiary footing as `createdBy`
     (server-observed use, not verified identity). Either way, any reader
@@ -1960,27 +1961,30 @@ Writable properties:
     [=invalid-request-body=] error.
   * `origin` (optional) - The Web origin (its ASCII serialization, e.g.
     `https://app.example.com`) the `id` [=did=] was bound to when the
-    collection was provisioned. A provisioning exchange in which the user's
-    agent authenticates the requesting application by origin (for example a
-    browser-attested credential-handler exchange) establishes an origin
-    binding the storage server is never a party to. Stamping the origin
+    collection was provisioned. It is present when the requester was
+    bound to a Web origin. A requester with no browser-attested origin (a
+    mobile app, a server-side service, a command-line agent) has none to
+    record. A provisioning exchange in which the user's agent authenticates
+    a requesting application by origin (for example a browser-attested
+    credential-handler exchange) establishes an origin binding the storage
+    server is never a party to. Stamping the origin
     beside `id` preserves that fact, and gives a reader a human-readable
     attribution label without further lookups. A present value that is not
     the ASCII serialization of a Web origin (a URL carrying a path, query,
     or fragment; the empty string) is an [=invalid-request-body=] error.
-  * `url` (optional) - The application's canonical URL, when the
-    provisioning exchange identified the application by URL rather than by
-    origin alone. Several applications may share one origin, and the origin
-    cannot tell them apart. The URL serves as the same attribution label
+  * `url` (optional) - The requester's canonical URL, when the provisioning
+    exchange identified the requester by URL rather than by origin alone.
+    Several applications may share one origin, and the origin cannot tell
+    them apart. The URL serves as the same attribution label
     without further lookups, one level finer than `origin`. When `url` is
     present, `origin` MUST be present too. The value MUST be an absolute URL
     with the `http` or `https` scheme, its origin MUST equal `origin`, and
     it MUST NOT carry a query or a fragment. A value that fails any of these
     is an [=invalid-request-body=] error.
-  * `name` (optional) - A human-readable display label for the application.
-    It lets a reader show the application by name without further lookups.
+  * `name` (optional) - A human-readable display label for the requester.
+    It lets a reader show the requester by name without further lookups.
     Like every other member it is the controller's assertion, and a reader
-    MUST NOT treat it as the application's verified identity. A present value
+    MUST NOT treat it as the requester's verified identity. A present value
     that is not a non-empty string is an [=invalid-request-body=] error.
 * `backend` (optional) - An object describing the storage backend selected for
   this collection. If not specified when the Collection is created, defaults to
@@ -3481,16 +3485,16 @@ neither can substitute for the other:
   never change it.
 * `writerId` is an **unkeyed, client-declared attribution label**: an opaque
   string the writing agent volunteers about itself, naming which writing
-  agent produced the current revision. The server stores and serves it
-  verbatim and MUST NOT verify it, MUST NOT compute or default it, and MUST
+  agent produced the current revision. The server MUST store it and serve it
+  verbatim, and MUST NOT verify it, MUST NOT compute or default it, and MUST
   NOT use it as an input to authorization or any other server decision. It
   is advisory replication metadata, nothing more.
 
 These two leave room for a third, distinct axis: a client-asserted identity
 -- a [=did=] the controller writes and maintains about another party. The
 Collection-level `generator` property (see
-[[[#collection-metadata-data-model]]]), whose `id` names the application a
-Collection was provisioned for, is this axis. Unlike `writerId` it is an
+[[[#collection-metadata-data-model]]]), whose `id` names the requester (an
+app, service, or agent) a Collection was provisioned for, is this axis. Unlike `writerId` it is an
 identity claim and a stable join key; unlike `createdBy` it is a controller
 assertion rather than a server-verified fact, and a reader treats it as
 exactly that.
@@ -5001,13 +5005,13 @@ Each entry in `documents` describes one changed Resource:
   replica that encounters an `epoch` it does not know re-reads the Collection
   Description.
 * `writerId` (optional) - the Resource's writer-attribution label, mirroring
-  the Resource Metadata property (see [[[#writer-attribution]]]). A server
-  that stores `writerId` MUST include it here, as this is the member that lets a
-  replica recognize its own writes echoed back (entries carrying its own
-  label) without fetching (and on an encrypted Collection, without decrypting)
-  each document, and lets replicas break same-`updatedAt` last-writer-wins
-  ties deterministically on a shared `(updatedAt, writerId)` key. Like
-  everywhere else it is advisory and never server-verified.
+  the Resource Metadata property (see [[[#writer-attribution]]]). The server
+  MUST include it here when the Resource has one, as this is the member that
+  lets a replica recognize its own writes echoed back (entries carrying its
+  own label) without fetching (and on an encrypted Collection, without
+  decrypting) each document, and lets replicas break same-`updatedAt`
+  last-writer-wins ties deterministically on a shared `(updatedAt, writerId)`
+  key. Like everywhere else it is advisory and never server-verified.
 
 **Tombstones.** A soft-deleted Resource surfaces as
 `{ "id", "_deleted": true, "updatedAt", "version", "etag" }` with no `data`
