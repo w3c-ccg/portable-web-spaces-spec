@@ -1437,7 +1437,15 @@ disclose those remains provider-defined.
 * Requires appropriate authorization (root zcap invoked by the controller of one
   or more spaces, or a zcap granting permission to read a one or more spaces)
 
-* Lists only the spaces the requester is authorized to see
+* Lists every space the requester is authorized to see, whatever its `type`.
+
+* Each entry in `items` MUST carry the space's `id`, `url`, and `type`. The
+  `type` value is the same array as the `type` of the space's Metadata object
+  (see [[[#space-metadata-data-model]]]), so a client can tell spaces apart by
+  type without reading each one.
+
+* No query parameter selects which types are listed. The listing depends only
+  on what the requester is authorized to see.
 
 * MAY be paginated (see [[[#pagination]]])
 
@@ -1464,7 +1472,8 @@ Content-type: application/json
   "items": [
     {
       "id": "81246131-69a4-45ab-9bff-9c946b59cf2e",
-      "url": "/space/81246131-69a4-45ab-9bff-9c946b59cf2e/"
+      "url": "/space/81246131-69a4-45ab-9bff-9c946b59cf2e/",
+      "type": ["Space"]
     }
   ]
 }
