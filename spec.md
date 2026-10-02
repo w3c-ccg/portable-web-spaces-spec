@@ -116,6 +116,13 @@ This subsection is non-normative.
     to the companion specification [[PWS-EC]], with wire behavior unchanged.
     Core keeps the `chunks` reserved path segment and the `edv` Encryption
     Scheme Registry entry's server-visible structural validation.
+  * The `changes` query profile's `checkpoint` is an opaque string scoped to
+    the server and Collection that issued it, replacing the
+    `{ id, updatedAt }` object. The feed is ordered by a per-Collection feed
+    position the server assigns, no longer by `(updatedAt, id)`, and each feed
+    entry carries its own `checkpoint`. A server rejects a retired object
+    checkpoint, and the replica restarts its pull from the beginning (see
+    [[[#query-profile-changes]]]).
 
 No stored data moves across the v0.4-to-v0.5 path changes. The durable
 artifacts to audit are capabilities. A delegated capability whose
@@ -4933,16 +4940,15 @@ Request body:
 ```json
 {
   "profile": "changes",
-  "checkpoint": { "id": "<resourceId>", "updatedAt": "<ISO-8601 timestamp>" },
+  "checkpoint": "<checkpoint string from a prior response>",
   "limit": 100
 }
 ```
 
-* `checkpoint` (OPTIONAL) - the position to resume from, echoed from a prior
-  response (see below). When present it MUST be an object with a string `id` and a
-  string `updatedAt`; a malformed `checkpoint` is rejected with an
-  [=invalid-request-body=] (`400`) error. When absent, the feed starts at the
-  beginning.
+* `checkpoint` (OPTIONAL) - the position to resume from, a string echoed
+  verbatim from a prior response (see below). A `checkpoint` this server did
+  not issue for this Collection is rejected with an [=invalid-request-body=]
+  (`400`) error. When absent, the feed starts at the beginning.
 * `limit` (OPTIONAL) - the requested batch size. A non-finite value, or a value
   less than `1`, falls back to a server default (a server default of `100` is
   RECOMMENDED); a server MAY clamp `limit` down to an implementation maximum.
@@ -4966,10 +4972,11 @@ Response body:
       "custom": {
         "name": "Hello World greeting",
         "tags": { "project": "demo", "status": "draft" }
-      }
+      },
+      "checkpoint": "eyJmZWVkIjoiaHR0cHM6Ly9leGFtcGxlLmNvbS9zcGFjZS84MTI0NjEzMS02OWE0LTQ1YWItOWJmZi05Yzk0NmI1OWNmMmUvbWVzc2FnZXMvIiwicG9zaXRpb24iOjF9"
     }
   ],
-  "checkpoint": { "id": "hello-world", "updatedAt": "2026-01-15T12:00:00.000Z" }
+  "checkpoint": "eyJmZWVkIjoiaHR0cHM6Ly9leGFtcGxlLmNvbS9zcGFjZS84MTI0NjEzMS02OWE0LTQ1YWItOWJmZi05Yzk0NmI1OWNmMmUvbWVzc2FnZXMvIiwicG9zaXRpb24iOjF9"
 }
 ```
 
@@ -4979,7 +4986,8 @@ Each entry in `documents` describes one changed Resource:
 * `_deleted` - a boolean; `true` on a tombstone (a soft-deleted Resource), `false`
   otherwise. The underscore-prefixed member name is deliberate: it matches the
   wire convention of offline-first replication clients.
-* `updatedAt` - the ISO-8601 timestamp of the change; the feed's ordering key.
+* `updatedAt` - the ISO-8601 timestamp of the change. It is a wall-clock stamp
+  and carries no ordering guarantee within the feed.
 * `version` - a monotonic content version, for ordering and comparison. It is
   always present, and a content write bumps it. It is not a validator: a client
   MUST NOT construct an `If-Match` value from it.
@@ -5021,9 +5029,12 @@ Each entry in `documents` describes one changed Resource:
   decrypting) each document, and lets replicas break same-`updatedAt`
   last-writer-wins ties deterministically on a shared `(updatedAt, writerId)`
   key. Like everywhere else it is advisory and never server-verified.
+* `checkpoint` - the opaque checkpoint that resumes the feed right after this
+  entry. A client can therefore resume from any prefix of a page, not only from
+  its end.
 
 **Tombstones.** A soft-deleted Resource surfaces as
-`{ "id", "_deleted": true, "updatedAt", "version", "etag" }` with no `data`
+`{ "id", "_deleted": true, "updatedAt", "version", "etag", "checkpoint" }` with no `data`
 member; the deletion bumps `version` and `etag` is the tombstone's validator.
 A tombstone retains its `createdBy`, where one was
 recorded, so that a deletion replicates together with the attribution of the
@@ -5031,13 +5042,34 @@ Resource it removes. It also carries as `writerId` the label the deleting
 request declared (see [[[#writer-attribution]]]), if any. Since a deletion is a
 revision, its attribution and tie-breaking work like any other write's.
 
-**Ordering and resumption.** Entries are ordered by an ascending `(updatedAt, id)`
-keyset. The top-level `checkpoint` echoes the position of the last entry in
-`documents`, or is `null` when nothing changed past the supplied `checkpoint`
-(the end of the feed). A client resumes by sending the returned `checkpoint` as
-the `checkpoint` of its next request; the resulting sequence of calls is the pull
-loop of a replication protocol. A metadata-only edit re-surfaces the Resource
-with a bumped `updatedAt` and `metaVersion` but an unchanged `version` and `data`.
+**Ordering and resumption.** Entries are ordered by the issuing server's feed
+position: a per-Collection sequence that the server assigns to a write at the
+moment the write becomes visible. A server MUST assign it so that no write can
+land at or before a position it has already returned to a client. `updatedAt`
+carries no ordering guarantee, and two entries may share it.
+
+The checkpoint is an opaque string, scoped to the server URL and the Collection
+that issued it. A client stores it, compares it by equality only, and echoes it
+back verbatim; it MUST NOT parse or construct one. The top-level `checkpoint`
+equals the `checkpoint` of the last entry in `documents`, or is `null` when
+nothing changed past the supplied `checkpoint` (the end of the feed). A client
+resumes by sending the returned `checkpoint` as the `checkpoint` of its next
+request; the resulting sequence of calls is the pull loop of a replication
+protocol. A server MUST reject a `checkpoint` it did not issue for the target
+Collection with [=invalid-request-body=] (`400`). A client whose checkpoint is
+rejected restarts its pull from the beginning, with no `checkpoint`. This is
+safe because a replica applies each entry keyed by Resource id. A metadata-only
+edit re-surfaces the Resource with a bumped `updatedAt` and `metaVersion` but an
+unchanged `version` and `data`.
+
+<div class="note">
+This note is non-normative. The encoding of a checkpoint is the server's own choice, and a client gains
+nothing by reading inside one. For example, the reference implementation
+encodes a checkpoint as the base64url encoding, without padding, of the JSON
+object `{"feed": "<canonical Collection URL>", "position": <integer>}`. Another
+server, or a later version of the same server, may encode a checkpoint
+differently, for instance to carry one position per source.
+</div>
 
 **Scope.** Binary (non-JSON) Resources are excluded from the `changes` feed; blob
 replication is out of scope for this profile. This also means a write or
@@ -5069,10 +5101,26 @@ Content-type: application/json
       "updatedAt": "2026-01-15T12:00:00.000Z",
       "version": 1,
       "createdBy": "did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK",
-      "data": { "message": "hi" }
+      "data": { "message": "hi" },
+      "checkpoint": "eyJmZWVkIjoiaHR0cHM6Ly9leGFtcGxlLmNvbS9zcGFjZS84MTI0NjEzMS02OWE0LTQ1YWItOWJmZi05Yzk0NmI1OWNmMmUvbWVzc2FnZXMvIiwicG9zaXRpb24iOjF9"
     }
   ],
-  "checkpoint": { "id": "hello-world", "updatedAt": "2026-01-15T12:00:00.000Z" }
+  "checkpoint": "eyJmZWVkIjoiaHR0cHM6Ly9leGFtcGxlLmNvbS9zcGFjZS84MTI0NjEzMS02OWE0LTQ1YWItOWJmZi05Yzk0NmI1OWNmMmUvbWVzc2FnZXMvIiwicG9zaXRpb24iOjF9"
+}
+```
+
+The client then resumes by echoing that `checkpoint` in its next request:
+
+```http
+POST /space/81246131-69a4-45ab-9bff-9c946b59cf2e/messages/query HTTP/1.1
+Host: example.com
+Content-Type: application/json
+Authorization: ...
+
+{
+  "profile": "changes",
+  "checkpoint": "eyJmZWVkIjoiaHR0cHM6Ly9leGFtcGxlLmNvbS9zcGFjZS84MTI0NjEzMS02OWE0LTQ1YWItOWJmZi05Yzk0NmI1OWNmMmUvbWVzc2FnZXMvIiwicG9zaXRpb24iOjF9",
+  "limit": 100
 }
 ```
 
