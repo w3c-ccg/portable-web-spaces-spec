@@ -3344,11 +3344,10 @@ described in [[[#conditional-requests]]].
   results in a 204 success response
 
 The request MAY include a `Writer-Id` header declaring the deleting agent's
-attribution label (see [[[#writer-attribution]]]): a deletion is a revision
-like any other, and where the server keeps a tombstone the label it carries
-attributes the deletion (see the tombstone notes of the
-[`changes` profile](#query-profile-changes)), on the same declare-or-clear
-terms as a content write.
+attribution label (see [[[#writer-attribution]]]). A deletion is labelled on
+the same declare-or-clear terms as a content write. Where the server keeps a
+tombstone, the label it carries attributes the deletion (see the tombstone
+notes of the [`changes` profile](#query-profile-changes)).
 
 Example request to delete a resource via DELETE:
 
@@ -3407,7 +3406,8 @@ Metadata object; the timestamps and `createdBy` are OPTIONAL):
 * `createdAt` (optional) - The [[RFC3339]] `date-time` at which the Resource
   was created.
 * `updatedAt` (optional) - The [[RFC3339]] `date-time` at which the Resource's
-  content or user-writable metadata was last modified.
+  content was last written. A write of the user-writable metadata does not
+  change it (see [[[#update-resource-metadata-operation]]]).
 * `createdBy` (optional) - The [=did=] of the party whose capability invocation
   created the Resource. It is recorded on the first write and preserved
   unchanged by later writes, so it names the creator rather than the last
@@ -3452,19 +3452,18 @@ User-writable properties:
   wholesale by every metadata write. An omitted `epoch` on a metadata write
   preserves the stored value; a content write without the header clears it.
 * `writerId` (optional) - An opaque label naming the writing agent that
-  produced the Resource's current revision (see [[[#writer-attribution]]]
+  produced the Resource's current content (see [[[#writer-attribution]]]
   for its semantics, its deliberate separation from `createdBy`, and its
-  privacy considerations). The writer declares it, via the `Writer-Id`
-  header on a content write or a delete, or a top-level `writerId` member
-  on an Update Resource Metadata request, and the server stores it
+  privacy considerations). The writer declares it via the `Writer-Id`
+  header on a content write or a delete, and the server stores it
   verbatim. The value is not verified, and it MUST NOT be an input to any
   authorization decision. Like `epoch`, it is a sibling of `custom` rather
-  than part of it. Unlike `epoch`, whose stamp describes the content
-  write, `writerId` describes the latest revision whichever operation
-  produced it: every write either declares the writer's own label or
-  clears the stored one. A write that declares no `writerId` clears the
-  stored value, since attribution to a bygone writer is worse than no
-  attribution at all.
+  than part of it. Every content write or delete either declares the
+  writer's own label or clears the stored one. One that declares no
+  `Writer-Id` clears the stored value, since attribution to a bygone
+  writer is worse than no attribution at all. An Update Resource Metadata
+  request does not change the label, because the label describes the
+  content write, not the metadata write.
 
 On a Collection that declares an `encryption` descriptor (see
 [[[#encryption-scheme-registry]]]), the user-writable `custom` object is stored
@@ -3501,7 +3500,7 @@ neither can substitute for the other:
   never change it.
 * `writerId` is an **unkeyed, client-declared attribution label**: an opaque
   string the writing agent volunteers about itself, naming which writing
-  agent produced the current revision. The server MUST store it and serve it
+  agent made the Resource's last content write. The server MUST store it and serve it
   verbatim, and MUST NOT verify it, MUST NOT compute or default it, and MUST
   NOT use it as an input to authorization or any other server decision. It
   is advisory replication metadata, nothing more.
@@ -3515,8 +3514,7 @@ identity claim and a stable join key; unlike `createdBy` it is a controller
 assertion rather than a server-verified fact, and a reader treats it as
 exactly that.
 
-In every usage, including the `Writer-Id` request header and the top-level
-`writerId` member of an Update Resource Metadata request, the label is an opaque
+The label is carried by the `Writer-Id` request header, and it is an opaque
 non-empty string. A present but empty or malformed value is an
 [=invalid-request-body=] error.
 
@@ -3524,12 +3522,12 @@ The reason `writerId` is necessary: several distinct writing agents may share
 one invoking [=did=] (for example, the same delegated capability held by a
 user's several installs of one app), so `createdBy` (or any other
 server-verified identity) structurally cannot distinguish exactly the
-writers that most often race each other. A per-revision label lets
+writers that most often race each other. A label on each content write lets
 replication clients break same-timestamp last-writer-wins ties with a
 shared, deterministic `(updatedAt, writerId)` sort key. It also helps them
 recognize their own writes echoed back on the
 [`changes`feed](#query-profile-changes) without a fetch (on an encrypted
-Collection, without a decrypt), and attribute revision history for display.
+Collection, without a decrypt), and attribute each content write for display.
 
 Requirements on the writing client:
 
@@ -3537,14 +3535,14 @@ Requirements on the writing client:
   identity: it is an attribution label, never an identity, and it MUST NOT
   be treated as one (that is the `createdBy` axis). A random value minted
   per writing agent is RECOMMENDED.
-* A client performing a read-modify-write of a Metadata object SHOULD
-  replace the `writerId` it read with its own label (or omit the member)
-  rather than echoing the previous writer's back.
+* A server ignores a `writerId` member in the body of an Update Resource
+  Metadata request, so a client performing a read-modify-write of a Metadata
+  object need not remove the one it read.
 
 **Privacy considerations:** unlike the encrypted `custom` object, `writerId` is
 plaintext to the server, and a stable per-agent label reveals to the server
 (and to any reader of the Collection) how many writing agents stand behind
-one invoking [=did=], durably per revision -- information the server could
+one invoking [=did=], durably per content write -- information the server could
 otherwise only approximate from traffic analysis. This is accepted as the
 explicit price of pre-fetch echo suppression, which only a server-visible
 field can provide, and it is bounded: the label reveals the multiplicity of
@@ -3610,22 +3608,25 @@ object's `custom` object: the stored `custom` object is replaced by the one
 in the request body, so any user-writable property omitted from it is
 cleared (and a request body with no `custom` property clears them all).
 
-Two other top-level members are also writable, each with its own omission
-behavior. A request MAY carry `epoch` to set the Resource's key-epoch
-stamp; a request that omits it preserves the stored stamp, because the
-stamp describes the content write, not the metadata write (see
-[[[#key-epochs]]]). A request MAY carry `writerId` to declare the writing
-agent's attribution label; a request that omits it clears the stored label
-(see [[[#writer-attribution]]]). The label is cleared rather than
-preserved because a metadata write is itself a revision, and on an
-encrypted Collection it replaces the `custom` envelope wholesale, so
-keeping a previous writer's label would misattribute it.
+One other top-level member is also writable. A request MAY carry `epoch` to
+set the Resource's key-epoch stamp; a request that omits it preserves the
+stored stamp, because the stamp describes the content write, not the
+metadata write (see [[[#key-epochs]]]).
+
+The Resource's `writerId` label is not writable here. It names the writer of
+the Resource's content, so this operation leaves the stored label as it is
+(see [[[#writer-attribution]]]).
 
 Server-managed properties are not affected by this operation; a server MUST
-ignore any top-level properties other than `custom`, `epoch`, and `writerId`
+ignore any top-level properties other than `custom` and `epoch`
 present in the request body (so that a client may read the Metadata object,
 modify it, and `PUT` it back without first stripping the server-managed
 properties).
+
+This operation writes the Metadata object only. It does not change the
+Resource's stored representation, so a server MUST NOT change the Resource's
+`updatedAt` or the `ETag` validator of the Resource itself in response to it.
+The Metadata object's own `ETag` changes with each such write.
 
 Unlike the [[[#update-or-create-by-id-resource-operation]]], a `PUT` to
 `/meta` does not create anything: a Metadata object cannot exist apart
@@ -3671,9 +3672,8 @@ Errors (see [[[#error-type-registry]]] for canonical examples):
   per [[[#error-handling]]].
 * [=invalid-request-body=] (400) -- the request body is not a JSON object,
   or it breaks a validation rule of the Resource Metadata object (see
-  [[[#resource-metadata-data-model]]]), its top-level `epoch` member (see
-  [[[#epoch-stamping-on-resources]]]), or its top-level `writerId` member
-  (see [[[#writer-attribution]]]).
+  [[[#resource-metadata-data-model]]]) or its top-level `epoch` member (see
+  [[[#epoch-stamping-on-resources]]]).
 * [=unsupported-operation=] (501) -- the server does not implement the
   optional metadata endpoints.
 
@@ -5039,8 +5039,8 @@ member; the deletion bumps `version` and `etag` is the tombstone's validator.
 A tombstone retains its `createdBy`, where one was
 recorded, so that a deletion replicates together with the attribution of the
 Resource it removes. It also carries as `writerId` the label the deleting
-request declared (see [[[#writer-attribution]]]), if any. Since a deletion is a
-revision, its attribution and tie-breaking work like any other write's.
+request declared (see [[[#writer-attribution]]]), if any. A deletion's
+attribution and tie-breaking work like a content write's.
 
 **Ordering and resumption.** Entries are ordered by the issuing server's feed
 position: a per-Collection sequence that the server assigns to a write at the
@@ -5059,8 +5059,8 @@ protocol. A server MUST reject a `checkpoint` it did not issue for the target
 Collection with [=invalid-request-body=] (`400`). A client whose checkpoint is
 rejected restarts its pull from the beginning, with no `checkpoint`. This is
 safe because a replica applies each entry keyed by Resource id. A metadata-only
-edit re-surfaces the Resource with a bumped `updatedAt` and `metaVersion` but an
-unchanged `version` and `data`.
+edit re-surfaces the Resource with a bumped `metaVersion` but an unchanged
+`updatedAt`, `version` and `data`.
 
 <div class="note">
 This note is non-normative. The encoding of a checkpoint is the server's own choice, and a client gains
