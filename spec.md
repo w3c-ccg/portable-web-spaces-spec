@@ -232,7 +232,7 @@ is just [[[#resources-and-blobs]]] plus the baseline authorization profile
 | **+ Collection mgmt** | create / manage collections in a Space                                                           | [[[#collections]]]                                                                                    | `collection-management`                                   |
 | **+ Space mgmt**      | manage an individual Space                                                                       | [[[#read-space-operation]]] (Space endpoints)                                                         | `space-management`                                        |
 | **+ Multi-tenant**    | create / manage many Spaces on a server                                                          | [[[#spaces-repositories]]]                                                                            | the `spaces` URL member                                   |
-| **+ Extensions**      | linksets, policy, metadata, export, backends, query, quotas, encryption, changes-query | [[[#linksets]]]                                                                                       | one `features` token per extension, named as listed       |
+| **+ Extensions**      | linksets, policy, metadata, export, backends, query, quotas, encryption, changes-query, created-by | [[[#linksets]]]                                                                                       | one `features` token per extension, named as listed       |
 
 Each tier stacks on the one above it. The **Minimal** profile is a permissioned
 key/value CRUD API built from simple HTTP verbs and delegatable
@@ -1196,7 +1196,8 @@ Link: <https://example.com/pws/service>; rel="service"
         "url": "https://w3c-ccg.github.io/wallet-attached-storage-spec/v0.5/",
         "spaces": "https://example.com/pws/spaces/",
         "features": ["listing", "collection-management", "space-management",
-                     "linksets", "policy", "backends", "quotas"]
+                     "linksets", "policy", "backends", "quotas",
+                     "created-by"]
       },
       {
         "version": "0.4",
@@ -1556,7 +1557,8 @@ Space properties automatically added by the server:
   (see [[[#space-controller-and-the-root-of-trust]]]) the party that creates a
   space need not be the party that controls it. Recording it is OPTIONAL, so a
   client MUST treat an absent `createdBy` as "not recorded" rather than as an
-  assertion that the space has no creator.
+  assertion that the space has no creator. A server that records it says so
+  with the `created-by` feature token (see below).
 * `url` - A relative URL to the space itself, in canonical (trailing-slash)
   form. Added by the server, used in the Space Metadata object as well as
   the [[[#list-spaces-operation]]] result. The Metadata object's own URL is
@@ -1572,6 +1574,21 @@ Space properties automatically added by the server:
   reader learns it without a second request. It is read-only: a server MUST
   ignore a `backends` supplied in a request body. A server without pluggable
   backends (see [[[#backends]]]) omits it.
+
+A server that records `createdBy` on every Resource, Collection, and Space
+created under a capability invocation MUST advertise the `created-by` token in
+its version entry's `features` array (see
+[[[#service-description-data-model]]]). A server that advertises `created-by`
+MUST record `createdBy` on each of them. A client MUST NOT assume attribution
+on a server that does not advertise the token. A client feature that depends
+on attribution refuses to run on such a server rather than reading an absent
+`createdBy` as anonymous.
+
+<div class="note">
+The `created-by` token is a candidate for promotion to a baseline requirement
+in a later breaking version. That step waits until a second client feature,
+beyond a wallet's agent-connection inbox, depends on attribution.
+</div>
 
 The Space Metadata object therefore splits in two. Its user-writable members
 are `type` and `name`. Its server-derived members are `createdBy`, `url`,
@@ -3416,7 +3433,9 @@ Metadata object; the timestamps and `createdBy` are OPTIONAL):
   the other server-managed properties it is read-only: it cannot be set through
   the [[[#update-resource-metadata-operation]]]. Recording it is OPTIONAL, so a
   client MUST treat an absent `createdBy` as "not recorded" rather than as an
-  assertion that the Resource has no creator.
+  assertion that the Resource has no creator. A server that records it says
+  so with the `created-by` feature token (see
+  [[[#space-metadata-data-model]]]).
 
 This metadata model does not mandate a stored `etag` / version property as
 such; a Resource's version is always exposed as an HTTP `ETag` validator, per
