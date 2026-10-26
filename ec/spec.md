@@ -2,7 +2,7 @@
 
 This document defines the Encrypted Collections profile for Portable Web
 Spaces ([[PWS]]): the client-side construction by which a PWS
-[collection](https://w3c-ccg.github.io/wallet-attached-storage-spec/#dfn-collections)'s
+[collection](https://w3c-ccg.github.io/portable-web-spaces-spec/#dfn-collections)'s
 contents are end-to-end encrypted under rotatable key epochs,
 so that several readers can hold per-reader keys, reader removal has a
 cryptographic meaning, and a storage server never holds key material.
@@ -12,7 +12,7 @@ storage substrate. For everything but large documents, a conforming PWS
 server needs nothing beyond its baseline surface: it stores
 opaque envelopes, validates their non-secret shape (the `edv` scheme of the
 PWS [Encryption Scheme
-Registry](https://w3c-ccg.github.io/wallet-attached-storage-spec/#encryption-scheme-registry)),
+Registry](https://w3c-ccg.github.io/portable-web-spaces-spec/#encryption-scheme-registry)),
 and serves the non-secret descriptor and epoch stamps. Those normative
 requirements bind clients -- writers and readers of encrypted collections --
 except where a requirement is explicitly identified as the server-visible
@@ -28,7 +28,7 @@ server's [=version entry=] for this profile is itself their advertisement
 
 | Specification                                                  | Relationship                                                                                                                                                                                                                                                                                                                                                                           |
 |----------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| [[PWS]]                                                        | The storage substrate: Spaces, Collections, Resources, the `encryption` descriptor slot, the Encryption Scheme Registry's `edv` envelope validation, conditional writes, the `changes` feed, and the service description this profile's [=version entry=] is listed in ([[[#service-description]]]). This profile's server-visible halves ([descriptor shape validation](https://w3c-ccg.github.io/wallet-attached-storage-spec/#epoch-data-model), the epoch stamp surfaces, the [`blinded-index` query profile](https://w3c-ccg.github.io/wallet-attached-storage-spec/#query-profile-blinded-index) with its unique-attribute enforcement) are defined there.                                                                                |
+| [[PWS]]                                                        | The storage substrate: Spaces, Collections, Resources, the `encryption` descriptor slot, the Encryption Scheme Registry's `edv` envelope validation, conditional writes, the `changes` feed, and the service description this profile's [=version entry=] is listed in ([[[#service-description]]]). This profile's server-visible halves ([descriptor shape validation](https://w3c-ccg.github.io/portable-web-spaces-spec/#epoch-data-model), the epoch stamp surfaces, the [`blinded-index` query profile](https://w3c-ccg.github.io/portable-web-spaces-spec/#query-profile-blinded-index) with its unique-attribute enforcement) are defined there.                                                                                |
 | [[PWS-AUTHZ]]                                                  | The baseline PWS authorization profile: zCaps over HTTP Signatures, the exact-match `invocationTarget` rule, and the `Digest` request-body integrity header. Cited by [[[#chunk-authorization]]]. |
 | [[APP-CONNECT]]                                                | The companion profile by which an application obtains capabilities into a wallet's Space. It defers to this profile for the encrypted-collection construction: the epoch roster, the envelope format, recipient-key derivation, the definition of an epoch-roster recipient, and the [=resource log=] profile under which its enrolled clients co-manage key resources ([[[#resource-log-profile]]]). |
 | [[DID-WEBVH]]                                                  | The log format the [=resource log=] profile is extracted from ([[[#log-webvh]]]), and one method a Space controller's [=controller document=] may be verified under. Nothing outside that profile depends on it. |
@@ -72,7 +72,7 @@ defines.
 ### The single epoch era {#single-epoch-era}
 
 This profile has exactly one [=era=]. An encrypted collection's
-[descriptor](https://w3c-ccg.github.io/wallet-attached-storage-spec/#collection-data-model)
+[descriptor](https://w3c-ccg.github.io/portable-web-spaces-spec/#collection-data-model)
 carries a key-epoch roster from the moment the collection exists, and every
 envelope seals to an epoch key and binds the epoch it sealed under. There is
 no descriptor-less era, no epoch-less envelope, and consequently no
@@ -91,7 +91,7 @@ acceptance branch for either anywhere in the profile:
   <dt><dfn data-lt="encrypted collections|encrypted">encrypted
   collection</dfn></dt>
   <dd>A PWS
-  [collection](https://w3c-ccg.github.io/wallet-attached-storage-spec/#dfn-collections)
+  [collection](https://w3c-ccg.github.io/portable-web-spaces-spec/#dfn-collections)
   whose Collection Metadata object declares the `edv` encryption scheme
   in its `encryption` member, and whose resources are stored as
   [=envelopes=]. Its descriptor carries an epoch roster from creation
@@ -214,24 +214,24 @@ acceptance branch for either anywhere in the profile:
 
   <dt><dfn data-lt="collections">collection</dfn></dt>
   <dd>A PWS
-  [Collection](https://w3c-ccg.github.io/wallet-attached-storage-spec/#dfn-collections)
+  [Collection](https://w3c-ccg.github.io/portable-web-spaces-spec/#dfn-collections)
   [[PWS]].</dd>
 
   <dt><dfn data-lt="resources">resource</dfn></dt>
   <dd>A PWS
-  [Resource](https://w3c-ccg.github.io/wallet-attached-storage-spec/#resources-and-blobs)
+  [Resource](https://w3c-ccg.github.io/portable-web-spaces-spec/#resources-and-blobs)
   [[PWS]].</dd>
 
   <dt><dfn data-lt="Spaces">Space</dfn></dt>
   <dd>A PWS
-  [Space](https://w3c-ccg.github.io/wallet-attached-storage-spec/#spaces)
+  [Space](https://w3c-ccg.github.io/portable-web-spaces-spec/#spaces)
   [[PWS]].</dd>
 </dl>
 
 ## Service description {#service-description}
 
 A server tells clients which specifications it speaks through the PWS
-[service description](https://w3c-ccg.github.io/wallet-attached-storage-spec/#service-description):
+[service description](https://w3c-ccg.github.io/portable-web-spaces-spec/#service-description):
 a server-wide JSON document whose `specs` member maps each specification's
 persistent identifier to the versions of it the server implements. This
 section declares this profile's identifier and defines the [=version entry=]
@@ -283,7 +283,7 @@ both affordances (other keys elided):
     "https://w3id.org/pws/encrypted-collections": [
       {
         "version": "0.1",
-        "url": "https://w3c-ccg.github.io/wallet-attached-storage-spec/ec/",
+        "url": "https://w3c-ccg.github.io/portable-web-spaces-spec/ec/",
         "features": ["blinded-index-query", "governed-history-logs"]
       }
     ]
@@ -326,7 +326,7 @@ conforming descriptor in which any of them is absent.
 * `scheme` (REQUIRED) - The string `edv`.
 * `version` (OPTIONAL) - The positive-integer version of the `edv` envelope
   wire format, per the PWS [Encryption Scheme
-  Registry](https://w3c-ccg.github.io/wallet-attached-storage-spec/#encryption-scheme-registry).
+  Registry](https://w3c-ccg.github.io/portable-web-spaces-spec/#encryption-scheme-registry).
   An absent `version` means `1`. This document describes version `1`.
 * `type` (OPTIONAL) - The string `WasEpochConfiguration`, the descriptor's
   schema identifier under the log form ([[[#log-form]]]). Inside a log
@@ -355,9 +355,9 @@ conforming descriptor in which any of them is absent.
 
 The descriptor's `scheme` and `version` are set-once for the life of the
 collection, per [[PWS]], whose [Epoch data
-model](https://w3c-ccg.github.io/wallet-attached-storage-spec/#epoch-data-model)
+model](https://w3c-ccg.github.io/portable-web-spaces-spec/#epoch-data-model)
 and
-[Encryption Scheme Registry](https://w3c-ccg.github.io/wallet-attached-storage-spec/#encryption-scheme-registry)
+[Encryption Scheme Registry](https://w3c-ccg.github.io/portable-web-spaces-spec/#encryption-scheme-registry)
 define the server-visible checks over these members (shape validation, `epochs`
 append-only enforcement, `currentEpoch` monotonicity, and the structural
 fail-closed rejection of plaintext writes). These checks do not cover `type`,
@@ -876,7 +876,7 @@ single request (or a single encryption [=envelope=]) can carry, without the
 server ever parsing or reassembling anything. The server treats each chunk
 exactly like a binary resource representation -- stored bytes plus a content
 type (see [[PWS]]'s [Content Types and
-Representations](https://w3c-ccg.github.io/wallet-attached-storage-spec/#content-types-and-representations))
+Representations](https://w3c-ccg.github.io/portable-web-spaces-spec/#content-types-and-representations))
 -- and framing and reassembly (including the client-side encryption of
 [[[#chunked-envelopes]]]) are entirely the client's concern. The server never
 concatenates a resource's chunks, and reading the parent resource's own
@@ -889,9 +889,9 @@ anything else a client chooses to store there.
 
 Error names in this section are [[PWS]] error types; their canonical
 `application/problem+json` examples are in [[PWS]]'s [Error Type
-Registry](https://w3c-ccg.github.io/wallet-attached-storage-spec/#error-type-registry).
+Registry](https://w3c-ccg.github.io/portable-web-spaces-spec/#error-type-registry).
 The maximum-privacy rule of [[PWS]]'s [Error
-Handling](https://w3c-ccg.github.io/wallet-attached-storage-spec/#error-handling)
+Handling](https://w3c-ccg.github.io/portable-web-spaces-spec/#error-handling)
 -- an under-authorized request is indistinguishable from a missing target --
 applies to a chunk exactly as it does to a resource.
 
@@ -948,12 +948,12 @@ header](https://w3id.org/pws/authz-profile#request-body-integrity-digest-header)
 of [[PWS-AUTHZ]]) applies per request -- that is, per chunk. The backend's
 `maxUploadBytes` cap and quota accounting apply to a chunk write exactly as
 they do to a resource write (see [[PWS]]'s
-[Quotas](https://w3c-ccg.github.io/wallet-attached-storage-spec/#quotas)).
+[Quotas](https://w3c-ccg.github.io/portable-web-spaces-spec/#quotas)).
 
 Each chunk carries its own strong `ETag` validator, independent of the parent
 resource's and of the other chunks'. The `If-Match` / `If-None-Match` write
 preconditions of [[PWS]]'s [Conditional
-Requests](https://w3c-ccg.github.io/wallet-attached-storage-spec/#conditional-requests)
+Requests](https://w3c-ccg.github.io/portable-web-spaces-spec/#conditional-requests)
 apply per chunk, against that validator.
 
 Example request (storing chunk `0` as raw bytes):
@@ -1041,7 +1041,7 @@ Errors:
   against the chunk's own `ETag`.
 
 Unlike [[PWS]]'s [Delete Resource
-operation](https://w3c-ccg.github.io/wallet-attached-storage-spec/#delete-resource-operation),
+operation](https://w3c-ccg.github.io/portable-web-spaces-spec/#delete-resource-operation),
 deleting a chunk is not idempotent: a `DELETE` of an absent chunk is rejected
 with `not-found` (`404`) rather than a `204`. This is deliberate -- a client
 reassembling a chunked representation must be able to distinguish a chunk that
@@ -1137,14 +1137,14 @@ Errors:
 
 A resource's chunks are bound to the resource. Deleting the parent resource
 (see [[PWS]]'s [Delete Resource
-operation](https://w3c-ccg.github.io/wallet-attached-storage-spec/#delete-resource-operation))
+operation](https://w3c-ccg.github.io/portable-web-spaces-spec/#delete-resource-operation))
 MUST cascade-delete all of its chunks; there is no way to leave chunks behind
 a deleted resource. A resource's chunks are carried alongside its content by a
 Space export and restored by the matching import (the `export` reserved
 segment of [[PWS]]).
 
 Chunk writes and deletes are invisible to [[PWS]]'s [`changes` query
-profile](https://w3c-ccg.github.io/wallet-attached-storage-spec/#query-profile-changes):
+profile](https://w3c-ccg.github.io/portable-web-spaces-spec/#query-profile-changes):
 storing or deleting a chunk affects only the chunk's own `ETag` validator and
 MUST NOT advance the parent resource's position in the feed, and the feed
 enumerates resources only, not chunks. A client replicating a chunked
@@ -1158,7 +1158,7 @@ appears on the feed.
 
 Chunk operations use the same authorization model as every other [[PWS]]
 operation (see [[PWS]]'s
-[Authorization](https://w3c-ccg.github.io/wallet-attached-storage-spec/#authorization)):
+[Authorization](https://w3c-ccg.github.io/portable-web-spaces-spec/#authorization)):
 writes (`PUT`, `DELETE`) are capability-only, while reads (`GET`, `HEAD`, and
 the container listing) are capability-or-policy. A chunk write's capability
 `invocationTarget` MUST be the chunk's own full URL (member form), and the
@@ -1246,7 +1246,7 @@ entries envelopes carry ([[[#indexed-entries]]],
 ([[[#index-schema]]]). The query wire shape and the server's matching
 are the server-visible half, defined by [[PWS]]'s [`blinded-index`
 query
-profile](https://w3c-ccg.github.io/wallet-attached-storage-spec/#query-profile-blinded-index).
+profile](https://w3c-ccg.github.io/portable-web-spaces-spec/#query-profile-blinded-index).
 The server serves that half only where its [=version entry=] for this
 profile carries the `blinded-index-query` token ([[[#feature-tokens]]]). An
 indexable collection stored on a server that lists no such token is fully
@@ -1631,7 +1631,7 @@ Three parties appear in this profile:
   the connecting application's side), each
   holding a key listed in the controller document. Any number of writers may
   append; the profile assumes no coordination between them beyond the storage
-  server's [Conditional Request](https://w3c-ccg.github.io/wallet-attached-storage-spec/#conditional-requests)
+  server's [Conditional Request](https://w3c-ccg.github.io/portable-web-spaces-spec/#conditional-requests)
   compare-and-swap primitive (see [[[#log-append]]]).
 * The **host** -- the storage server holding the log resource. Under [[PWS]]
   the host is trusted to enforce authorization on writes; this profile

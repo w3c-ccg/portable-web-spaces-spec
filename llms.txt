@@ -6,14 +6,14 @@ This is an experimental W3C CCG draft (v0.3), undergoing regular revisions. It i
 
 ## Docs
 
-- [Specification, full text (Markdown source)](https://raw.githubusercontent.com/w3c-ccg/wallet-attached-storage-spec/main/spec.md): The entire core specification -- data model, HTTP API, error registry, and the authorization contract every profile meets. Read this one if you want everything about the storage API.
-- [Specification, rendered](https://w3c-ccg.github.io/wallet-attached-storage-spec/): The same document as static HTML, with section numbering, cross-references, and a table of contents. Requires no JavaScript.
-- [Specification, full text (Markdown source, published)](https://w3c-ccg.github.io/wallet-attached-storage-spec/spec.md): The Markdown source, served from the same origin as the rendered page.
-- [Authorization Profile, full text (Markdown source)](https://w3c-ccg.github.io/wallet-attached-storage-spec/authz-profile/authz-profile.md): The baseline authorization profile -- zCaps over HTTP Signatures, the root capability, delegation, the Digest header, and the `PublicCanRead` policy type. Read this to sign a request.
-- [Authorization Profile, rendered](https://w3c-ccg.github.io/wallet-attached-storage-spec/authz-profile/): The same profile as static HTML.
-- [Encrypted Collections, full text (Markdown source)](https://w3c-ccg.github.io/wallet-attached-storage-spec/ec/spec.md): The client-side profile for end-to-end encrypted Collections -- the encryption descriptor and key-epoch roster, the Encrypted Data Vault envelope, chunked resources, the blinded index, recipient management, and the resource log profile. Read this to write or read an encrypted Collection.
-- [Encrypted Collections, rendered](https://w3c-ccg.github.io/wallet-attached-storage-spec/ec/): The same profile as static HTML.
+- [Specification, full text (Markdown source)](https://raw.githubusercontent.com/w3c-ccg/portable-web-spaces-spec/main/spec.md): The entire core specification -- data model, HTTP API, error registry, and the authorization contract every profile meets. Read this one if you want everything about the storage API.
+- [Specification, rendered](https://w3c-ccg.github.io/portable-web-spaces-spec/): The same document as static HTML, with section numbering, cross-references, and a table of contents. Requires no JavaScript.
+- [Specification, full text (Markdown source, published)](https://w3c-ccg.github.io/portable-web-spaces-spec/spec.md): The Markdown source, served from the same origin as the rendered page.
+- [Authorization Profile, full text (Markdown source)](https://w3c-ccg.github.io/portable-web-spaces-spec/authz-profile/authz-profile.md): The baseline authorization profile -- zCaps over HTTP Signatures, the root capability, delegation, the Digest header, and the `PublicCanRead` policy type. Read this to sign a request.
+- [Authorization Profile, rendered](https://w3c-ccg.github.io/portable-web-spaces-spec/authz-profile/): The same profile as static HTML.
+- [Encrypted Collections, full text (Markdown source)](https://w3c-ccg.github.io/portable-web-spaces-spec/ec/spec.md): The client-side profile for end-to-end encrypted Collections -- the encryption descriptor and key-epoch roster, the Encrypted Data Vault envelope, chunked resources, the blinded index, recipient management, and the resource log profile. Read this to write or read an encrypted Collection.
+- [Encrypted Collections, rendered](https://w3c-ccg.github.io/portable-web-spaces-spec/ec/): The same profile as static HTML.
 
 ## Optional
 
-- [GitHub repository](https://github.com/w3c-ccg/wallet-attached-storage-spec): Source, issue tracker, and revision history.
+- [GitHub repository](https://github.com/w3c-ccg/portable-web-spaces-spec): Source, issue tracker, and revision history.

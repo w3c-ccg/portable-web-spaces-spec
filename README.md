@@ -13,10 +13,10 @@
 
 This repository contains the Portable Web Spaces specification (in [ReSpec
 Markdown](https://respec.org/docs/#markdown) format), and its companion
-[Portable Web Spaces Authorization Profile](https://w3c-ccg.github.io/wallet-attached-storage-spec/authz-profile/)
+[Portable Web Spaces Authorization Profile](https://w3c-ccg.github.io/portable-web-spaces-spec/authz-profile/)
 (source in [`authz-profile/`](./authz-profile/)), which defines the baseline
 zCap authorization profile and the `PublicCanRead` policy type, and
-[Encrypted Collections for Portable Web Spaces](https://w3c-ccg.github.io/wallet-attached-storage-spec/ec/)
+[Encrypted Collections for Portable Web Spaces](https://w3c-ccg.github.io/portable-web-spaces-spec/ec/)
 (source in [`ec/`](./ec/)), the client-side profile for end-to-end encrypted
 Collections.
 
@@ -38,7 +38,7 @@ full text, following the [llmstxt.org](https://llmstxt.org/) convention.
 
 You can access the latest version of this specification at:
 
-https://w3c-ccg.github.io/wallet-attached-storage-spec/
+https://w3c-ccg.github.io/portable-web-spaces-spec/
 
 The W3C Community Group working on this specification can be found here:
 
@@ -61,7 +61,7 @@ mailing list as well.
 
 This document is a draft technical specification produced by the W3C Credentials
 Community Group, with the intent of progressing toward a W3C standard. Feedback
-is welcome via the [issue tracker](https://github.com/w3c-ccg/wallet-attached-storage-spec/issues)
+is welcome via the [issue tracker](https://github.com/w3c-ccg/portable-web-spaces-spec/issues)
 or the [public-credentials mailing list](https://lists.w3.org/Archives/Public/public-credentials/).
 
 ## Usage

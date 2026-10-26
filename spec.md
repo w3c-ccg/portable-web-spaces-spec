@@ -6,7 +6,7 @@
 storage API -- CRUD over an HTTP hierarchy with object-capability authorization.
 
 **Status:** Experimental W3C CCG draft, undergoing regular revisions.
-Rendered version: https://w3c-ccg.github.io/wallet-attached-storage-spec/
+Rendered version: https://w3c-ccg.github.io/portable-web-spaces-spec/
 
 </div>
 
@@ -144,7 +144,7 @@ document relies on, so that a section read in isolation is still intelligible.
 (as opposed to a bearer token). Reads are authorized in PWS just as writes are.
 The expanded form -- with the `Digest`, `Capability-Invocation`, and `Signature`
 headers -- appears once, in the
-[worked example](https://w3c-ccg.github.io/wallet-attached-storage-spec/authz-profile/#request-body-integrity-digest-header) of [[PWS-AUTHZ]].
+[worked example](https://w3c-ccg.github.io/portable-web-spaces-spec/authz-profile/#request-body-integrity-digest-header) of [[PWS-AUTHZ]].
 
 **Every path has one canonical form, and a trailing slash marks a container.**
 A container -- a Space or a Collection -- is canonically written with a
@@ -156,7 +156,7 @@ a different operation, and a [=server=] SHOULD answer it with a
 `308 Permanent Redirect` to the canonical form. No two paths defined by this
 specification differ only by a trailing slash. Because a signed capability
 invocation covers the full request URL (see
-[Capability Invocation](https://w3c-ccg.github.io/wallet-attached-storage-spec/authz-profile/#capability-invocation) in [[PWS-AUTHZ]]), a
+[Capability Invocation](https://w3c-ccg.github.io/portable-web-spaces-spec/authz-profile/#capability-invocation) in [[PWS-AUTHZ]]), a
 client that follows such a redirect
 MUST sign again for the new target rather than replay its `Authorization`
 header; sending the canonical form to begin with avoids the round trip.
@@ -308,7 +308,7 @@ PWS reads are authorized too, so the header is required on the
 the baseline authorization profile, [[PWS-AUTHZ]], and its fully expanded form
 -- with the `Digest`, `Capability-Invocation`, and `Signature` headers spelled
 out -- is shown once in the
-[worked example](https://w3c-ccg.github.io/wallet-attached-storage-spec/authz-profile/#request-body-integrity-digest-header) there. Producing that signature
+[worked example](https://w3c-ccg.github.io/portable-web-spaces-spec/authz-profile/#request-body-integrity-digest-header) there. Producing that signature
 requires a conformant PWS client: it is an Ed25519 `did:key` capability
 invocation, not something you can hand-write with curl.
 
@@ -620,7 +620,7 @@ Every authorization profile meets the following contract:
 * **Actions and targets.** A profile defines how a credential names the
   operation a request performs and the resource it acts on. The baseline
   names them by the uppercase HTTP method and the full request URL (see
-  [Capability Invocation](https://w3c-ccg.github.io/wallet-attached-storage-spec/authz-profile/#capability-invocation) in [[PWS-AUTHZ]]), the
+  [Capability Invocation](https://w3c-ccg.github.io/portable-web-spaces-spec/authz-profile/#capability-invocation) in [[PWS-AUTHZ]]), the
   same terms this specification's own operation sections use.
 * **Policies broaden, and only broaden.** A profile consults the effective
   [=policy=] only after any credential the request carries, under the
@@ -639,7 +639,7 @@ all the way to the space controller. The forms that proof takes (a credential
 the controller signs directly, one the controller delegated to another agent,
 or a matching access control policy) are defined by the authorization profile;
 for the baseline, see the
-[Root of Trust](https://w3c-ccg.github.io/wallet-attached-storage-spec/authz-profile/#space-controller-and-the-root-of-trust) section of
+[Root of Trust](https://w3c-ccg.github.io/portable-web-spaces-spec/authz-profile/#space-controller-and-the-root-of-trust) section of
 [[PWS-AUTHZ]].
 
 Space `controller`s MUST be in the form of a [DID](https://www.w3.org/TR/did-1.0/).
@@ -678,7 +678,7 @@ controller for that space is set explicitly. That is, a client specifies the
 `controller` as part of the payload of the PUT or POST create space request,
 and the server MUST verify that the creating request is authorized by that
 `controller`, as the authorization profile defines (for the baseline, see
-[Authorizing Space creation](https://w3c-ccg.github.io/wallet-attached-storage-spec/authz-profile/#authorizing-space-creation) in
+[Authorizing Space creation](https://w3c-ccg.github.io/portable-web-spaces-spec/authz-profile/#authorizing-space-creation) in
 [[PWS-AUTHZ]]). A request that is not is refused with [=controller-mismatch=]
 (400). A matching policy cannot authorize creation: no Space, and therefore no
 policy, exists yet.
@@ -1103,7 +1103,7 @@ authorization profile it implements under the profile's own identifier (see
 The baseline profile's entry, under `https://w3id.org/pws/authz-profile`,
 carries the signature algorithms and delegation-proof cryptosuites the server
 accepts; see the
-[Service Description Entry](https://w3c-ccg.github.io/wallet-attached-storage-spec/authz-profile/#service-description-entry) section of
+[Service Description Entry](https://w3c-ccg.github.io/portable-web-spaces-spec/authz-profile/#service-description-entry) section of
 [[PWS-AUTHZ]]. The example below shows one.
 
 ### Instance Disclosure {#instance-disclosure}
@@ -1193,7 +1193,7 @@ Link: <https://example.com/pws/service>; rel="service"
     "https://w3id.org/pws": [
       {
         "version": "0.5",
-        "url": "https://w3c-ccg.github.io/wallet-attached-storage-spec/v0.5/",
+        "url": "https://w3c-ccg.github.io/portable-web-spaces-spec/v0.5/",
         "spaces": "https://example.com/pws/spaces/",
         "features": ["listing", "collection-management", "space-management",
                      "linksets", "policy", "backends", "quotas",
@@ -1201,7 +1201,7 @@ Link: <https://example.com/pws/service>; rel="service"
       },
       {
         "version": "0.4",
-        "url": "https://w3c-ccg.github.io/wallet-attached-storage-spec/v0.4/",
+        "url": "https://w3c-ccg.github.io/portable-web-spaces-spec/v0.4/",
         "spaces": "https://example.com/pws/spaces/",
         "features": ["listing", "collection-management", "space-management",
                      "linksets", "policy", "backends", "quotas"]
@@ -1210,7 +1210,7 @@ Link: <https://example.com/pws/service>; rel="service"
     "https://w3id.org/pws/authz-profile": [
       {
         "version": "0.1",
-        "url": "https://w3c-ccg.github.io/wallet-attached-storage-spec/authz-profile/",
+        "url": "https://w3c-ccg.github.io/portable-web-spaces-spec/authz-profile/",
         "signatureAlgorithms": ["EdDSA"],
         "zcapCryptosuites": ["eddsa-jcs-2022"]
       }
@@ -1218,7 +1218,7 @@ Link: <https://example.com/pws/service>; rel="service"
     "https://w3id.org/pws/encrypted-collections": [
       {
         "version": "0.1",
-        "url": "https://w3c-ccg.github.io/wallet-attached-storage-spec/ec/",
+        "url": "https://w3c-ccg.github.io/portable-web-spaces-spec/ec/",
         "features": ["blinded-index-query", "governed-history-logs"]
       }
     ]
@@ -1313,7 +1313,7 @@ To create a Space:
   * The capability invocation MUST be *authorized by* the body's `controller`:
     either signed directly by the `controller` DID (the common case), or signed
     by another DID presenting a valid, unexpired delegation chain rooted in the
-    `controller` (see [Delegation](https://w3c-ccg.github.io/wallet-attached-storage-spec/authz-profile/#delegation) in [[PWS-AUTHZ]]). This is
+    `controller` (see [Delegation](https://w3c-ccg.github.io/portable-web-spaces-spec/authz-profile/#delegation) in [[PWS-AUTHZ]]). This is
     how the root of trust is
     initially set up (see [[[#space-controller-and-the-root-of-trust]]] for
     more details).
@@ -3299,7 +3299,7 @@ Example request (uploading a binary Blob via PUT; the bytes are stored
 verbatim under the supplied content type, see
 [[[#content-types-and-representations]]]). The `Digest` header binds the
 body to the request signature under the baseline authorization profile (see
-[Request Body Integrity](https://w3c-ccg.github.io/wallet-attached-storage-spec/authz-profile/#request-body-integrity-digest-header) in
+[Request Body Integrity](https://w3c-ccg.github.io/portable-web-spaces-spec/authz-profile/#request-body-integrity-digest-header) in
 [[PWS-AUTHZ]]):
 
 ```http
@@ -4240,7 +4240,7 @@ read: a capability that authorizes listing a Space, Collection, or Spaces
 Repository authorizes retrieval of *every* page of that list. The `limit` and
 `cursor` parameters select a page within an already-authorized target; they do
 not narrow, widen, or otherwise change the target a capability must match
-(see [Capability Invocation](https://w3c-ccg.github.io/wallet-attached-storage-spec/authz-profile/#capability-invocation) in [[PWS-AUTHZ]]). A
+(see [Capability Invocation](https://w3c-ccg.github.io/portable-web-spaces-spec/authz-profile/#capability-invocation) in [[PWS-AUTHZ]]). A
 server MUST NOT require a distinct capability per page.
 
 </section>
@@ -4256,7 +4256,7 @@ that does support a registered method MUST follow that method's profile here.
 </div>
 
 This registry lists the DID methods a Space `controller` (and, by the
-[current-key-set rule](https://w3c-ccg.github.io/wallet-attached-storage-spec/authz-profile/#current-key-set-rule) of [[PWS-AUTHZ]], any DID
+[current-key-set rule](https://w3c-ccg.github.io/portable-web-spaces-spec/authz-profile/#current-key-set-rule) of [[PWS-AUTHZ]], any DID
 signing in a capability chain) may use, and the verification a [=server=]
 performs for each. See [[[#space-controller-and-the-root-of-trust]]] for the
 method-neutral rules: refusal of unsupported methods and the

@@ -7,7 +7,7 @@ object capabilities (zCaps) invoked over HTTP Signatures, rooted in a Space's
 controller DID, together with the `PublicCanRead` access control policy.
 
 **Status:** Experimental W3C CCG draft, undergoing regular revisions.
-Rendered version: https://w3c-ccg.github.io/wallet-attached-storage-spec/authz-profile/
+Rendered version: https://w3c-ccg.github.io/portable-web-spaces-spec/authz-profile/
 
 </div>
 
@@ -55,7 +55,7 @@ explains them.
 The core specification [[PWS]] names this profile as the baseline: every
 server conformant to its Minimal profile implements this document. A server
 MAY implement further authorization profiles in addition; see the
-[Authorization](https://w3c-ccg.github.io/wallet-attached-storage-spec/#authorization)
+[Authorization](https://w3c-ccg.github.io/portable-web-spaces-spec/#authorization)
 section of [[PWS]].
 
 This profile's persistent identifier is `https://w3id.org/pws/authz-profile`.
@@ -65,14 +65,14 @@ see [[[#service-description-entry]]].
 The following are defined by [[PWS]] and only cited here:
 
 * The DID methods a Space `controller` may use, in the
-  [Space Controller DID Method Registry](https://w3c-ccg.github.io/wallet-attached-storage-spec/#space-controller-did-method-registry),
+  [Space Controller DID Method Registry](https://w3c-ccg.github.io/portable-web-spaces-spec/#space-controller-did-method-registry),
   and the rules for setting and changing a controller.
 * The `/policy` auxiliary resource, its discovery through the linkset, and
-  the [policy evaluation contract](https://w3c-ccg.github.io/wallet-attached-storage-spec/#access-control-policies).
-* The [Policy Type Registry](https://w3c-ccg.github.io/wallet-attached-storage-spec/#policy-type-registry),
+  the [policy evaluation contract](https://w3c-ccg.github.io/portable-web-spaces-spec/#access-control-policies).
+* The [Policy Type Registry](https://w3c-ccg.github.io/portable-web-spaces-spec/#policy-type-registry),
   where the policy type this document defines is registered.
 * The error kinds this profile reports, in the
-  [Error Type Registry](https://w3c-ccg.github.io/wallet-attached-storage-spec/#error-type-registry);
+  [Error Type Registry](https://w3c-ccg.github.io/portable-web-spaces-spec/#error-type-registry);
   see [[[#errors]]].
 
 ### Reading This Document {#reading-this-document}
@@ -174,9 +174,9 @@ all the way to the Space controller, by one of the following:
 
 The form a `controller` takes (a DID), the DID methods a server accepts, and
 the rules for setting or changing a controller are defined by [[PWS]] in its
-[Space `controller` and the Root of Trust](https://w3c-ccg.github.io/wallet-attached-storage-spec/#space-controller-and-the-root-of-trust)
+[Space `controller` and the Root of Trust](https://w3c-ccg.github.io/portable-web-spaces-spec/#space-controller-and-the-root-of-trust)
 section and its
-[Space Controller DID Method Registry](https://w3c-ccg.github.io/wallet-attached-storage-spec/#space-controller-did-method-registry).
+[Space Controller DID Method Registry](https://w3c-ccg.github.io/portable-web-spaces-spec/#space-controller-did-method-registry).
 Every server implementing this profile supports `did:key` [[DID-KEY]]
 controllers with Ed25519 keys in the Multikey encoding of [[CID]], as that
 registry requires.
@@ -190,7 +190,7 @@ present in that document, under the verification relationship the operation
 requires: `capabilityInvocation` for an invocation, `capabilityDelegation` for
 a delegation. A `did:key` document never changes. A document of a method with
 a mutable, verifiable history (see the
-[verified-log DID methods](https://w3c-ccg.github.io/wallet-attached-storage-spec/#verified-log-did-methods)
+[verified-log DID methods](https://w3c-ccg.github.io/portable-web-spaces-spec/#verified-log-did-methods)
 of [[PWS]]) changes as that history is extended, so the set of accepted keys
 is the current one. A delegation signed by a key that has since been removed
 from the delegator's document stops verifying the moment that verification
@@ -209,8 +209,8 @@ delegate's invocation or onward delegation.
 ### Authorizing Space creation {#authorizing-space-creation}
 
 When a Space is created via an HTTP `POST` or `PUT` operation (see the
-[Create Space](https://w3c-ccg.github.io/wallet-attached-storage-spec/#create-space-operation)
-and [Update (or Create by Id) Space](https://w3c-ccg.github.io/wallet-attached-storage-spec/#update-or-create-by-id-space-operation)
+[Create Space](https://w3c-ccg.github.io/portable-web-spaces-spec/#create-space-operation)
+and [Update (or Create by Id) Space](https://w3c-ccg.github.io/portable-web-spaces-spec/#update-or-create-by-id-space-operation)
 operations of [[PWS]]), the controller for that Space is set explicitly. That
 is, a client specifies the `controller` as part of the payload of the `PUT` or
 `POST` create Space request, and the server MUST verify that the invocation is
@@ -271,7 +271,7 @@ Bodyless requests (`GET`, `HEAD`, `DELETE`) carry no `Digest` header.
 
 The requirement applies per request. A chunk write (the chunk endpoints
 defined by [[PWS-EC]]) therefore carries a `Digest` of that chunk, and a query request
-(see the [Query Profile Registry](https://w3c-ccg.github.io/wallet-attached-storage-spec/#query-profile-registry))
+(see the [Query Profile Registry](https://w3c-ccg.github.io/portable-web-spaces-spec/#query-profile-registry))
 carries a `Digest` of the query body it signs.
 
 Example authorized write request, showing the `Digest` header and the
@@ -388,7 +388,7 @@ Collection's listing, every Resource in it, and its Metadata object -- which is
 what "share this collection" means. To grant the Collection's metadata
 alone, without its Resources, target the `meta` URL instead; that grant also
 covers the governing history log beneath it (see the
-[Collection Governing History Log](https://w3c-ccg.github.io/wallet-attached-storage-spec/#collection-governing-history-log)
+[Collection Governing History Log](https://w3c-ccg.github.io/portable-web-spaces-spec/#collection-governing-history-log)
 of [[PWS]]). The same holds one level up for a Space.
 
 <div class="ednote">
@@ -404,7 +404,7 @@ operation and reserve its path segments.
 ## Service Description Entry {#service-description-entry}
 
 A server that implements this profile lists it in its service description
-(see the [Service Description](https://w3c-ccg.github.io/wallet-attached-storage-spec/#service-description)
+(see the [Service Description](https://w3c-ccg.github.io/portable-web-spaces-spec/#service-description)
 of [[PWS]]) under the key `https://w3id.org/pws/authz-profile`. A version
 entry under that key carries, in addition to the `version` and `url` members
 every entry has:
@@ -430,7 +430,7 @@ evaluates every policy type this profile defines (see [[[#policies]]]).
     "https://w3id.org/pws/authz-profile": [
       {
         "version": "0.1",
-        "url": "https://w3c-ccg.github.io/wallet-attached-storage-spec/authz-profile/",
+        "url": "https://w3c-ccg.github.io/portable-web-spaces-spec/authz-profile/",
         "signatureAlgorithms": ["EdDSA"],
         "zcapCryptosuites": ["eddsa-jcs-2022"]
       }
@@ -458,11 +458,11 @@ or Resource, and defines how a policy is evaluated: a policy is consulted
 only after any capability the request carries, it can only broaden access,
 an absent or unrecognized `type` grants nothing, the most specific level wins,
 and the request's action is reduced to a `read` or `write` access kind. See
-its [Access Control Policies](https://w3c-ccg.github.io/wallet-attached-storage-spec/#access-control-policies)
+its [Access Control Policies](https://w3c-ccg.github.io/portable-web-spaces-spec/#access-control-policies)
 section for the contract.
 
 Policy `type` values are defined by profiles and registered in the
-[Policy Type Registry](https://w3c-ccg.github.io/wallet-attached-storage-spec/#policy-type-registry)
+[Policy Type Registry](https://w3c-ccg.github.io/portable-web-spaces-spec/#policy-type-registry)
 of [[PWS]]. This profile defines one type. A server implementing this profile
 MUST evaluate it.
 
@@ -484,7 +484,7 @@ setting it on a single Resource exposes only that Resource.
 
 This profile registers no error kinds of its own. It reports failures with
 the kinds of the
-[Error Type Registry](https://w3c-ccg.github.io/wallet-attached-storage-spec/#error-type-registry)
+[Error Type Registry](https://w3c-ccg.github.io/portable-web-spaces-spec/#error-type-registry)
 of [[PWS]], as [[RFC9457]] problem responses:
 
 * `missing-authorization` (401) - the `Authorization` or
@@ -504,7 +504,7 @@ of [[PWS]], as [[RFC9457]] problem responses:
   for an existing target.
 
 The maximum-privacy rule of [[PWS]]'s
-[Error Handling](https://w3c-ccg.github.io/wallet-attached-storage-spec/#error-handling)
+[Error Handling](https://w3c-ccg.github.io/portable-web-spaces-spec/#error-handling)
 governs which of these a server may return. A credential that is present but
 invalid describes the request, and MAY be reported precisely. A well-formed
 request that simply lacks privilege for an existing target MUST be reported as
