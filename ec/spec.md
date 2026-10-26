@@ -307,7 +307,7 @@ defines a way to work without it. Each is advertised by one token:
   governed `encryption` member of the collection's Metadata object from that
   log's head entry. This is the server side of the log form of an
   [=encryption descriptor=] ([[[#log-form]]]). Without it a deployment stays
-  on point state and gets its epoch-configuration integrity from the
+  on [=point state=] and gets its epoch-configuration integrity from the
   client-held epoch pin ([[[#epoch-integrity]]]).
 
 The token vocabulary is open and additive. A client MUST ignore a token it
@@ -331,7 +331,7 @@ conforming descriptor in which any of them is absent.
 * `type` (OPTIONAL) - The string `WasEpochConfiguration`, the descriptor's
   schema identifier under the log form ([[[#log-form]]]). Inside a log
   entry's `state` the member is REQUIRED ([[[#log-entry]]]). A
-  point-state projection served beside a log carries
+  [=point-state=] projection served beside a log carries
   the same member, so that the projection equals the verified head's
   `state` once `history` is stripped. A descriptor no log governs MAY
   omit it.
@@ -343,7 +343,7 @@ conforming descriptor in which any of them is absent.
   object with `resource`, the URL of the log resource governing this
   descriptor, and `method`, an echo of the log's format identifier,
   named to mirror the in-log `parameters.method`. The member appears only
-  on the point-state projection of a log-governed collection, not
+  on the [=point-state=] projection of a log-governed collection, not
   inside a log entry's `state` -- the log resource reserves the
   name there ([[[#log-resource]]]). The hint is never authoritative: the log's
   own genesis commits the format identifier, and a served `method` that
@@ -352,6 +352,12 @@ conforming descriptor in which any of them is absent.
   id and type, and the wrap of the blinding secret to each recipient
   ([[[#blinding-key]]]). Present from the descriptor's creation or
   never, and never rotated ([[[#blinding-key-lifecycle]]]).
+
+The list above is complete for a [=point-state=] descriptor. A log entry's
+`state` may carry one more member, `revisions`. That member is the
+collection's `revisions` descriptor, not part of the encryption descriptor.
+The log carries it because the log holds the collection's whole governed
+configuration ([[[#log-form]]]).
 
 The descriptor's `scheme` and `version` are set-once for the life of the
 collection, per [[PWS]], whose [Epoch data
@@ -539,7 +545,7 @@ close that gap, neither of them carried in the descriptor itself:
   so a host-minted configuration fails verification -- and the hash
   chain with a pinned head makes any rollback a chain break.
 
-A deployment on pure point state keeps the server's shape checks
+A deployment on [=pure point state=] keeps the server's shape checks
 (append-only `epochs`, monotonic `currentEpoch`) and the pin; only the
 log form additionally establishes authorship against the host itself.
 
@@ -1343,7 +1349,7 @@ full descriptor, `hmac` included, so the entry proof covers the
 member exactly as it covers the epoch configuration -- and
 fixed-at-provisioning becomes a claim a verifier can
 check across the entry chain: one permanent `id`, present from the
-first entry or absent from all. On pure point state the member has no
+first entry or absent from all. On [=pure point state=] the member has no
 client-side guard of its own (the epoch pin does not cover it), and a
 host serving a substituted `hmac` member knows its secret, so it can
 test guessed attribute values against the reader's subsequent query
@@ -1560,7 +1566,8 @@ define the log itself.
 
 ### Point state and log form {#log-form}
 
-An [=encryption descriptor=] as defined above is point state: the current
+An [=encryption descriptor=] as defined above is
+<dfn data-lt="point-state|pure point state">point state</dfn>: the current
 configuration, served whole, its invariants enforced by the server. Under
 the log form the same resource is governed as a hash-linked log of
 full-state entries, each entry proof-carrying and externally authorized,
@@ -1573,9 +1580,27 @@ Under the log form:
   descriptors, the string `WasEpochConfiguration`
   ([[[#descriptor-members]]]). The rules of this profile
   apply to the `state` of the verified head entry exactly as they apply
-  to a served point-state descriptor: same members
+  to a served [=point-state=] descriptor: same members
   ([[[#descriptor-members]]]), same first-epoch and append-only rules,
   same fail-closed refusal of an epoch-less state.
+* The `state` MAY carry one member beyond the descriptor's own:
+  `revisions`, the collection's `revisions` descriptor as the [Collection
+  Metadata data
+  model](https://w3c-ccg.github.io/portable-web-spaces-spec/#collection-metadata-data-model)
+  of [[PWS]] defines it (the conflict model and the write-once rule). The
+  slot is reserved by [[PWS]] for every governing profile (its [governed
+  members](https://w3c-ccg.github.io/portable-web-spaces-spec/#governed-members)
+  section). The server derives the collection's `revisions` member from
+  it and serves the `encryption` member as the rest of the `state`, so the
+  slot never appears on a [=point-state=] projection. A `state` without the
+  slot stands for the `revisions` defaults. Its `resolution` and
+  `immutable` are set at the genesis entry and never change across the
+  chain, which a verifier checks across consecutive entries as it checks
+  `scheme`, while `merge` may change from entry to entry. This profile
+  gives the slot no meaning of its own. An encrypted collection that is
+  write-once or carries a merge discipline declares it here because the
+  log holds the collection's whole governed configuration, and a verifier
+  that compares a projection to the head strips nothing but `history`.
 * Epoch history and log history are distinct axes. `epochs` remains
   append-only WITHIN each state (a resource-level invariant a verifier
   can check across consecutive entries), while the log records the
@@ -1589,7 +1614,7 @@ Under the log form:
   with a pinned head makes any rollback a chain break -- the log form
   is what carries this profile's epoch-configuration integrity
   ([[[#epoch-integrity]]]).
-* A point-state descriptor served beside a log is a projection bound to
+* A [=point-state=] descriptor served beside a log is a projection bound to
   the log. The projection's `history` member
   names the governing log ([[[#descriptor-members]]]), and a verifying
   consumer acts only on a projection equal to the verified head's `state`
@@ -1602,7 +1627,7 @@ head -- is served only where the server's [=version entry=] for this profile
 carries the `governed-history-logs` token ([[[#feature-tokens]]]). A writer
 MUST consult the token before choosing a framing, since the two are written
 through different endpoints. A deployment on a server without the token keeps
-point state and the client-held epoch pin ([[[#epoch-integrity]]]).
+[=point state=] and the client-held epoch pin ([[[#epoch-integrity]]]).
 
 Nothing in this profile's epoch rules depends on which framing carries
 the descriptor; a deployment adopts the log form per collection.
@@ -1685,7 +1710,7 @@ serialized without embedded newlines, and lines are separated by U+000A LINE
 FEED.
 
 The log resource is the only serving of the resource it governs: this
-profile defines no companion point-state document, and the governed
+profile defines no companion [=point-state=] document, and the governed
 resource's current state exists only as the `state` of the verified head
 entry ([[[#log-verification]]]).
 
@@ -1701,7 +1726,7 @@ A [=log entry=] is a JSON object with exactly five members, all REQUIRED:
 | `versionId`   | `<n>-<entryHash>`: the entry's ordinal position `n` (decimal, starting at `1`), a single `-`, and the entry hash ([[[#log-hashing]]]).                                                                                                            |
 | `versionTime` | The append time as an [[RFC3339]] UTC datetime (`Z` suffix). **Advisory only**; see below.                                                                                                                                                        |
 | `parameters`  | A JSON object; see the per-entry rules below.                                                                                                                                                                                                     |
-| `state`       | The full resource state at this version: a JSON object that MUST carry a `type` member (a string) identifying its schema. State schemas are defined by the referencing profile, not by the log format; for this profile's descriptors the schema is `WasEpochConfiguration` ([[[#log-form]]]). |
+| `state`       | The full resource state at this version: a JSON object that MUST carry a `type` member (a string) identifying its schema. State schemas are defined by the referencing profile, not by the log format; for this profile's descriptors the schema is `WasEpochConfiguration`, which also admits the `revisions` slot that [[PWS]] reserves in every governed `state` ([[[#log-form]]]). |
 | `proof`       | A non-empty array of Data Integrity proofs ([[[#log-proof]]]).                                                                                                                                                                                    |
 
 A verifier MUST reject an entry carrying members other than these five.
@@ -2475,7 +2500,7 @@ service.
 
 ### Configuration replay {#configuration-replay}
 
-A served point-state descriptor carries nothing that lets a client
+A served [=point-state=] descriptor carries nothing that lets a client
 detect the replay of an entire prior consistent configuration -- the
 server's checks bind its own storage, not what it chooses to serve.
 Deployments needing rollback protection keep client-side monotonic

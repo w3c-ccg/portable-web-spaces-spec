@@ -123,6 +123,12 @@ This subsection is non-normative.
     entry carries its own `checkpoint`. A server rejects a retired object
     checkpoint, and the replica restarts its pull from the beginning (see
     [[[#query-profile-changes]]]).
+  * The `encryption` descriptor is now [=creation-only=]. It is declared by
+    the write that creates the Collection, and a write that adds one to an
+    existing Collection is refused. The Collection Metadata object gains a
+    `revisions` member (the conflict model and the write-once rule), whose
+    `resolution` and `immutable` are creation-only too (see
+    [[[#collection-metadata-data-model]]]).
 
 No stored data moves across the v0.4-to-v0.5 path changes. The durable
 artifacts to audit are capabilities. A delegated capability whose
@@ -2044,14 +2050,18 @@ Writable properties:
   material and stores the descriptor opaquely. Its purpose is discovery: any
   authorized reader (including a delegated consumer that did not create the
   collection) learns from the Collection's Metadata object that the collection
-  is encrypted, and decrypts with its own keys. The descriptor is **set-once,
-  version-monotonic**: a server
-  MUST allow declaring it on a collection that lacks one (e.g. migrating a
-  pre-existing collection), provided no `plaintext` member is present (the
-  two are mutually exclusive; see `plaintext` below), and MUST accept a
+  is encrypted, and decrypts with its own keys. The descriptor is
+  [=creation-only=] and version-monotonic. It is declared by the write
+  that creates the Collection (see [[[#creation-only-members]]]), and it
+  excludes the `plaintext` member (the two are mutually exclusive; see
+  `plaintext` below). A server MUST reject (with an [=encryption-immutable=]
+  error) a write that adds a descriptor to an existing collection that lacks
+  one, since under replication two such writes cannot be merged. A collection
+  that exists without a descriptor never becomes encrypted in place. The path
+  is a new collection and a copy. A server MUST accept a
   re-declaration of the standing
   values (including an explicit `"version": 1` on a descriptor that had omitted
-  it) as an idempotent no-op, but MUST reject (with an `encryption-immutable` error)
+  it) as an idempotent no-op, but MUST reject (with an [=encryption-immutable=] error)
   any attempt to change the `scheme`, decrease or remove the `version`, or
   clear the descriptor, on an existing
   collection, since that would corrupt the already-stored encrypted Resources.
@@ -2100,7 +2110,7 @@ Writable properties:
   `encryption`, and a server MUST reject a create or update whose resulting
   object would carry both with an [=invalid-request-body=] error. A
   Collection carrying neither member is a [=plaintext collection=] with no
-  server-side processing declared. Unlike the set-once `encryption`,
+  server-side processing declared. Unlike the [=creation-only=] `encryption`,
   `plaintext` is updatable for the collection's life: a supplied object
   replaces the stored one, an update that omits the member leaves the stored
   one untouched, and `{}` is the empty state (present, declaring nothing).
@@ -2148,6 +2158,86 @@ Writable properties:
     MUST NOT require the already-stored Resources to be rewritten for the
     change to take effect.
 
+* `revisions` (optional) - An object declaring the collection's conflict
+  model. It says what the server does with concurrent revisions of the
+  collection's Resources, and whether those Resources are write-once.
+  Replication relies on this declaration (see the `changes` profile,
+  [[[#query-profile-changes]]]). A present value MUST be
+  an object carrying only the members below. A value that is not an object,
+  or that carries any other member, is an [=invalid-request-body=] error:
+  unlike `encryption`, an unknown member is refused rather than stored,
+  because the descriptor governs how the server treats writes, and a member
+  it does not know is one it cannot apply. Its members:
+  * `resolution` (optional) - A string naming how the server disposes of
+    concurrent revisions of one Resource. The value set is closed. In this
+    version it holds one value, `last-writer-wins`, which is also the value
+    an absent member stands for. Under it, of two revisions of one Resource,
+    the server keeps the later one. The value `keep-conflicts` is reserved
+    for a future disposition in which the server keeps the losing revisions
+    for a client to merge, and is refused in this version. Any value outside
+    the set is an [=invalid-request-body=] error. The set is closed for the
+    reason the `encryption.scheme` registry is. A server that does not know
+    a value cannot apply it, and a client could not tell an unknown value
+    from an unsupported one.
+  * `immutable` (optional) - A boolean, `false` when absent. When `true`, the
+    collection is <dfn id="write-once-collection"
+    data-lt="write-once">write-once</dfn>, and a stored Resource's content
+    is never changed. A server MUST apply the rule inside the write's
+    critical section, on both Resource write operations:
+    * A content write to an id that holds a live Resource is refused with a
+      [=resource-immutable=] (409) error, unless the body repeats the stored
+      representation (equal bytes under the same media type, compared without
+      its parameters). A repeat is a no-op. The server stores nothing and
+      answers success with the stored `ETag`.
+    * A write to an id that holds a tombstone is held to the same rule
+      against the deleted content. A repeat of it is a no-op answering the
+      tombstone's `ETag`, and a different body is refused with
+      [=resource-immutable=]. A write-once collection therefore cannot be
+      edited through a delete and a re-create.
+    * A write to an id that holds nothing is an ordinary create.
+
+    The rule covers a Resource's content and, where the server implements
+    [[PWS-EC]], the chunks under its reserved `chunks` segment. It does not
+    cover the Resource's Metadata object at `meta`, which stays writable,
+    and it does not refuse deletion. The rule holds per origin. Under
+    replication, two partitioned creates of one id with different bodies
+    both land, and `resolution` keeps one. An update stamped before the
+    flag arrived at its origin but applied after it is stored, not refused.
+  * `merge` (optional) - An object naming the merge discipline the
+    collection's applications apply to concurrent revisions. It is the
+    client's assertion, like `generator`. A server MUST store and serve it
+    verbatim and MUST NOT read it. A value that is not an object is an
+    [=invalid-request-body=] error. Its content is the application's to
+    define. For example, a notes app whose Resources are CRDT documents
+    might record the library and document schema its clients merge with:
+
+    ```json
+    "revisions": {
+      "merge": {
+        "type": "crdt",
+        "library": "automerge",
+        "schema": "https://app.example.com/notes/schema/v2"
+      }
+    }
+    ```
+
+    A second client of the collection reads this before it writes, and
+    knows which merge rules the stored documents expect.
+
+  `resolution` and `immutable` are [=creation-only=] (see
+  [[[#creation-only-members]]]). A write that changes a set value, or sets a
+  value off its default on an existing collection, is refused with a
+  [=revisions-immutable=] (409) error. Each member is compared by the value
+  it stands for, so a write that restates a default, or drops an explicit
+  one, changes nothing and passes. On a full-replacement write of this
+  object, an omitted `revisions` therefore stands for the defaults. It
+  passes when the stored members are at their defaults and is refused when
+  one is set, as an omitted `encryption` is. `merge` follows the body and may
+  change freely. On a log-governed collection the descriptor is held by the
+  log's head `state` (see [[[#governed-members]]]), and a direct write of
+  this object may restate it but not change it. A differing `merge` there is
+  refused with [=revisions-immutable=] too.
+
 * `custom` (optional) - A JSON object holding the user's annotations, with the
   same shape as the Resource-level `custom` (see
   [[[#resource-metadata-data-model]]]): an optional human-readable `name` and
@@ -2171,6 +2261,38 @@ Writable properties:
   replaces wholesale, so a preserved value would misdescribe the new envelope.
   A client writing to an encrypted Collection therefore re-declares `epoch`
   each time.
+
+#### Creation-only members {#creation-only-members}
+
+Three members of this object are <dfn id="creation-only-member"
+data-lt="creation-only|creation-only members">creation-only</dfn>:
+`encryption`, `revisions.resolution` and `revisions.immutable`. Each is
+declared in the write that creates the Collection and is immutable afterward.
+The creating writes are:
+
+* the [[[#create-collection-add-collection-to-a-space-operation]]] (`POST`);
+* the guarded create by `PUT` of this object with `If-None-Match: *` (see
+  [[[#update-or-create-by-id-collection-operation]]]), or an unconditional
+  `PUT` of this object that finds no Collection under the id;
+* the governing history log's guarded create (see
+  [[[#governing-log-declaration]]]), for the members the log governs.
+
+A write that adds a creation-only member to an existing Collection that
+lacks it, or changes or clears one the Collection holds, MUST be refused,
+with [=encryption-immutable=] for `encryption` and [=revisions-immutable=]
+for the two `revisions` members. Re-declaring the standing value is an
+idempotent no-op. The rule exists for replication. Two replicas of one
+Collection can each accept a first declaration, or one can accept a
+declaration while the other accepts a full replacement without it, and no
+order of applying the two is right. Last-writer-wins would converge on a
+Collection whose `encryption` has silently gone, and two different first
+declarations are a fork. A member set at creation travels with the Collection
+from the start, so a replica never sees two values for it. A replica that
+does receive two different set values treats it as an invariant violation and
+stops applying writes to that Collection rather than choosing. A member the
+incoming object omits and the local one holds is kept. `encryption.version`
+is the one part of a creation-only member that still moves, and it merges by
+the greater value.
 
 Properties automatically added by the server, and read-only: a server MUST
 ignore any of them supplied in a request body.
@@ -2443,7 +2565,10 @@ read-only: a server MUST ignore `createdAt`, `updatedAt`, `createdBy`, `url`,
 and `linkset` in a request body, so that a read-modify-write roundtrip needs no
 stripping. On a Collection whose `encryption` descriptor is governed by its
 history log, the server derives that member from the log's head and refuses a
-direct write of it (see [[[#collection-governing-history-log]]]). An update
+direct write of it (see [[[#collection-governing-history-log]]]). The
+[=creation-only=] members are declared by the create and cannot be added,
+changed or cleared by an update (see [[[#creation-only-members]]]). An omitted
+`revisions` stands for its defaults (see its member definition). An update
 that omits `plaintext` leaves the stored member untouched (see its member
 definition), and so does an update that omits `generator`. And an update
 that omits `backend` MUST keep the stored backend selection. Clearing it
@@ -2523,12 +2648,19 @@ Errors (see [[[#error-type-registry]]] for canonical examples):
 * [=reserved-id=] (409) -- the supplied Collection `id` collides with one of the
   [[[#space-level-reserved-endpoints]]] (for example, `collections` or
   `linkset`).
-* [=encryption-immutable=] (409) -- the update tried to change the `scheme`,
-  decrease or remove the `version`, or clear an existing `encryption`
-  descriptor (the descriptor is set-once, version-monotonic; see
-  [[[#collection-metadata-data-model]]]). Also raised when the update changes the `id`
+* [=encryption-immutable=] (409) -- the update tried to add an `encryption`
+  descriptor to an existing Collection that lacks one, or to change the
+  `scheme`, decrease or remove the `version`, or clear an existing descriptor
+  (the descriptor is creation-only, version-monotonic; see
+  [[[#creation-only-members]]]). Also raised when the update changes the `id`
   or `type` of the descriptor's `hmac` member, or removes that member; the
   blinding key is permanent once present (see [[[#blinding-key-member]]]).
+* [=revisions-immutable=] (409) -- the update tried to add, change or clear
+  `revisions.resolution` or `revisions.immutable` on an existing Collection
+  (both are creation-only; see [[[#creation-only-members]]]), or, on a
+  Collection whose `revisions` is governed by its history log, carried a
+  `revisions` that differs from the derived one (see
+  [[[#governed-members]]]).
 * [=invalid-request-body=] (400) -- the request body is not a JSON object,
   or it breaks a validation rule of the Collection Metadata object (see
   [[[#collection-metadata-data-model]]]), its key-epoch and `hmac` members
@@ -2737,7 +2869,7 @@ every reader. Which members a log governs, what an entry is beyond its
 profile**, not by this specification. The `encryption` descriptor of the
 [[[#collection-metadata-data-model]]] is the first governed member, under the
 resource log profile of [[PWS-EC]]; see
-[[[#governed-encryption-descriptor]]].
+[[[#governed-members]]].
 
 Support is OPTIONAL and discoverable. A server that implements the
 sub-resource advertises `governed-history-logs` in its PWS-EC version entry's
@@ -2862,10 +2994,10 @@ client holding that `ETag` sees the change on its next conditional read. A
 Collection re-created under the same id restarts the log's version, so a client
 MUST NOT compare validators across a delete and re-create.
 
-#### The first governed member: `encryption` {#governed-encryption-descriptor}
+#### Governed members {#governed-members}
 
 The `encryption` descriptor (see [[[#collection-metadata-data-model]]]) is the
-first, and in this version the only, member a profile governs. On a log-governed
+first member a profile governs. On a log-governed
 Collection the head entry's `state` is an encryption descriptor, and the
 Collection is an encrypted Collection from the declaration onward: the
 envelope rule applies to its Resources and its Metadata object, and the
@@ -2874,17 +3006,73 @@ the Metadata object. The profile's `state` carries a `type` member naming its
 schema ([[PWS-EC]]); the server stores it with the rest of the state and
 does not interpret it.
 
+The `state` has one reserved slot beside the descriptor's own members:
+`revisions`, carrying the Collection's `revisions` descriptor (see
+[[[#collection-metadata-data-model]]]). On a log-governed Collection the
+server derives both members from the head `state`. `revisions` is the slot,
+and `encryption` is the rest of the `state` with the slot taken out, so the
+served `encryption` member never carries it. A `state` without the slot
+stands for the `revisions` defaults. The slot is validated on every log write
+by the shape rules of the `revisions` member, and a direct write of
+`revisions` through the [[[#update-or-create-by-id-collection-operation]]]
+may restate the derived descriptor but not change it, refused with
+[=revisions-immutable=] (409).
+
+For example, a head entry whose `state` declares a write-once encrypted
+Collection:
+
+```json
+"state": {
+  "type": "WasEpochConfiguration",
+  "scheme": "edv",
+  "currentEpoch": "urn:uuid:8d3f...",
+  "epochs": [...],
+  "revisions": { "immutable": true }
+}
+```
+
+is served on the Collection's Metadata object as two members. `encryption`
+is the `state` without the slot, with `history` stamped on (see
+[[[#governing-log-declaration]]]), and `revisions` is the slot:
+
+```json
+"encryption": {
+  "type": "WasEpochConfiguration",
+  "scheme": "edv",
+  "currentEpoch": "urn:uuid:8d3f...",
+  "epochs": [...],
+  "history": {
+    "method": "resource-log:0.1",
+    "resource": "https://example.com/space/81246131-69a4-45ab-9bff-9c946b59cf2e/73WakrfVbNJBaAmhQtEeDv/meta/log"
+  }
+},
+"revisions": { "immutable": true }
+```
+
+A later `PUT` of the Metadata object may carry `"revisions": { "immutable":
+true }` unchanged, or omit it, and passes. One carrying
+`"revisions": { "immutable": false }` is refused with
+[=revisions-immutable=].
+
 On every log write the server runs, on the head `state`, the same checks the
 [[[#update-or-create-by-id-collection-operation]]] runs on a supplied
 descriptor: the shape validation of [[[#key-epoch-server-validation]]] and
 the scheme recognition rule of [[[#encryption-scheme-registry]]]. On an
 append it also runs the transition invariants against the prior head's
 `state`: `epochs` is append-only, `currentEpoch` never moves backwards,
-`hmac` is permanent once present, and the descriptor's `scheme` and
-`version` are set-once, version-monotonic. A violating write MUST be refused
+`hmac` is permanent once present, the descriptor's `scheme` and
+`version` are set-once, version-monotonic, and the `revisions` slot's
+`resolution` and `immutable` are set-once. A violating write MUST be refused
 with the error the Update Collection operation raises for the same change,
-and MUST leave the log unchanged. This is the one clause of this mechanism
-that is specific to encryption; a later governed member adds its own.
+and MUST leave the log unchanged.
+
+The guarded create of the log declares the governed members, so it counts as
+a creating write for them (see [[[#creation-only-members]]]). It may set
+`revisions.resolution` or `revisions.immutable` on a Collection whose
+Metadata object holds them at their defaults. It MUST NOT change a value the
+Metadata object already sets. That is refused with [=revisions-immutable=]
+(409), as a client-written `encryption` is refused with
+[=encryption-immutable=] (see [[[#governing-log-declaration]]]).
 
 ### Read Governing History Log Operation {#read-governing-history-log-operation}
 
@@ -2948,7 +3136,7 @@ MUST be refused with an [=invalid-request-body=] error (400). A write
 capability can therefore add to a log but not erase or rewrite it. The
 server also checks the line contract and, for a governed `encryption`
 descriptor, the head-state transition
-([[[#governed-encryption-descriptor]]]). It verifies nothing inside an
+([[[#governed-members]]]). It verifies nothing inside an
 appended entry: a bad proof or a broken hash link is a chain break that a
 verifying reader detects under the governing profile.
 
@@ -3015,9 +3203,13 @@ Errors (see [[[#error-type-registry]]] for canonical examples):
 * [=unsupported-encryption-scheme=] (400) -- the head `state` declares a
   `scheme` (or a `version` of one) the server does not recognize.
 * [=encryption-immutable=] (409) -- the guarded create targets a Collection
-  whose Description already holds a client-written `encryption` descriptor;
-  or the append changes the `scheme`, moves the `version` backward, or
-  changes or drops the `hmac` member.
+  whose Metadata object already holds a client-written `encryption`
+  descriptor; or the append changes the `scheme`, moves the `version`
+  backward, or changes or drops the `hmac` member.
+* [=revisions-immutable=] (409) -- the guarded create's `revisions` slot
+  changes a `resolution` or `immutable` the Collection's Metadata object
+  already sets to another value; or the append changes either member of the
+  slot (see [[[#governed-members]]]).
 * [=precondition-failed=] (412) -- an `If-Match` / `If-None-Match: *`
   precondition evaluated false: another writer appended first, or the log
   already exists; see [[[#conditional-requests]]].
@@ -3194,6 +3386,11 @@ Errors (see [[[#error-type-registry]]] for canonical examples):
   [=plaintext index=] is already held by a different Resource in the
   Collection (see [[[#collection-metadata-data-model]]]). Checked only after
   the caller's authorization has been verified, and atomically with the write.
+* [=resource-immutable=] (409) -- the Collection is [=write-once=] and the
+  server-generated id collides with a stored Resource or tombstone whose
+  representation the body does not repeat (see the `revisions` member of
+  [[[#collection-metadata-data-model]]]). Checked only after the caller's
+  authorization has been verified, and atomically with the write.
 * [=quota-exceeded=] (507) -- the Collection's backend has no storage quota
   remaining (see [[[#quotas]]]).
 * [=payload-too-large=] (413) -- the upload exceeds the backend's
@@ -3260,6 +3457,12 @@ cleared. The request MAY likewise include a `Writer-Id` header declaring the
 writing agent's attribution label (see [[[#writer-attribution]]]); the value
 is stored as the Resource Metadata `writerId` property, and when absent any
 stored `writerId` is cleared.
+
+On a [=write-once=] Collection (`revisions.immutable` is `true`, see
+[[[#collection-metadata-data-model]]]) this operation creates but does not
+update. A `PUT` to an id that holds a Resource or a tombstone succeeds only
+when the body repeats the stored representation, as a no-op answering the
+stored `ETag`, and is otherwise refused with [=resource-immutable=].
 
 Example request to create a resource via PUT:
 
@@ -3333,6 +3536,11 @@ Errors (see [[[#error-type-registry]]] for canonical examples):
   [=plaintext index=] is already held by a different Resource in the
   Collection (see [[[#collection-metadata-data-model]]]). Checked only after
   the caller's authorization has been verified, and atomically with the write.
+* [=resource-immutable=] (409) -- the Collection is [=write-once=] and the
+  id holds a Resource or tombstone whose representation the body does not
+  repeat (see the `revisions` member of
+  [[[#collection-metadata-data-model]]]). Checked only after the caller's
+  authorization has been verified, and atomically with the write.
 * [=quota-exceeded=] (507) -- the Collection's backend has no storage quota
   remaining (see [[[#quotas]]]).
 * [=payload-too-large=] (413) -- the upload exceeds the backend's
@@ -5307,7 +5515,9 @@ profile [[PWS-AUTHZ]] lists which it emits when.
 | `https://w3id.org/pws#invalid-authorization-header`  | <dfn id="invalid-authorization-header">invalid-authorization-header</dfn>   | 400            | An `Authorization`, `Capability-Invocation`, or `Digest` header is malformed, unparseable, or failed verification.                                                                                                                                                                                                                                                                                               |
 | `https://w3id.org/pws#controller-mismatch`           | <dfn id="controller-mismatch">controller-mismatch</dfn>                     | 400            | The capability invocation in a Create Space request is not currently authorized by the `controller` supplied in the request body: it is neither signed by that DID nor accompanied by a valid, unexpired delegation chain rooted in it. Servers SHOULD differentiate the cause (chain rooted elsewhere, expired delegation, failed proof) in the `detail` string where they can; see [[[#create-space-errors]]]. |
 | `https://w3id.org/pws#unsupported-backend`           | <dfn id="unsupported-backend">unsupported-backend</dfn>                     | 409            | A requested `backend` id is not in the space's [[[#space-backends-available]]] list.                                                                                                                                                                                                                                                                                                                             |
-| `https://w3id.org/pws#encryption-immutable`          | <dfn id="encryption-immutable">encryption-immutable</dfn>                   | 409            | A Collection update tried to change the `scheme`, decrease or remove the `version`, or clear an existing `encryption` descriptor; or it tried to change the `id` or `type` of the descriptor's `hmac` member, or remove that member. The descriptor is set-once, version-monotonic: declaring it on a Collection that lacks one is allowed (and re-declaring the standing values is a no-op), but changing its `scheme`, moving its `version` backward, or clearing it on a populated Collection would corrupt the stored, client-encrypted Resources, and replacing or dropping the blinding key would orphan every blinded index. See [[[#collection-metadata-data-model]]] and [[[#blinding-key-member]]]. |
+| `https://w3id.org/pws#encryption-immutable`          | <dfn id="encryption-immutable">encryption-immutable</dfn>                   | 409            | A Collection write tried to add an `encryption` descriptor to an existing Collection that lacks one; or to change the `scheme`, decrease or remove the `version`, or clear an existing descriptor; or it tried to change the `id` or `type` of the descriptor's `hmac` member, or remove that member. The descriptor is creation-only, version-monotonic: it is declared by the write that creates the Collection (re-declaring the standing values is a no-op), a late declaration cannot be merged under replication, changing its `scheme`, moving its `version` backward, or clearing it on a populated Collection would corrupt the stored, client-encrypted Resources, and replacing or dropping the blinding key would orphan every blinded index. See [[[#creation-only-members]]] and [[[#blinding-key-member]]]. |
+| `https://w3id.org/pws#revisions-immutable`           | <dfn id="revisions-immutable">revisions-immutable</dfn>                     | 409            | A Collection write tried to add, change or clear `revisions.resolution` or `revisions.immutable` on an existing Collection, or, on a Collection whose `revisions` is governed by its history log, carried a `revisions` that differs from the derived one. Both members are creation-only, declared by the write that creates the Collection; re-declaring the standing value is a no-op. See [[[#creation-only-members]]] and [[[#governed-members]]]. |
+| `https://w3id.org/pws#resource-immutable`            | <dfn id="resource-immutable">resource-immutable</dfn>                       | 409            | A content write into a write-once Collection (`revisions.immutable` is `true`) targeted an id that holds a Resource or a tombstone, and the body does not repeat the stored representation. A repeat is a no-op answering the stored `ETag`; a write to an id that holds nothing is an ordinary create. Checked after authorization and atomically with the write. See the `revisions` member of [[[#collection-metadata-data-model]]]. |
 | `https://w3id.org/pws#encryption-history-log-governed` | <dfn id="encryption-history-log-governed">encryption-history-log-governed</dfn> | 409            | A Collection update carried an `encryption` member on a Collection whose descriptor is governed by its history log. The member is read-only on that path: it is derived from the log's head entry, and changes by an append to the log at the Collection's `meta/log` sub-resource. See [[[#collection-governing-history-log]]]. |
 | `https://w3id.org/pws#encryption-scheme-mismatch`    | <dfn id="encryption-scheme-mismatch">encryption-scheme-mismatch</dfn>       | 422            | A write into an encrypted Collection -- a Resource's content, or the `custom` object of a Resource's or the Collection's own Metadata -- had a body (or `Content-Type`) that does not conform to the Collection's declared `encryption` scheme envelope profile. Reachable only by a caller already authorized to write -- see [[[#encryption-scheme-registry]]].                                                                                                                                           |
 | `https://w3id.org/pws#unsupported-encryption-scheme` | <dfn id="unsupported-encryption-scheme">unsupported-encryption-scheme</dfn> | 400            | A Collection create/update declared an `encryption` `scheme` (or a `version` of one) the server does not recognize or support. See [[[#encryption-scheme-registry]]].                                                                                                                                                                                                                                                                    |
@@ -5506,10 +5716,11 @@ Content-type: application/problem+json
 }
 ```
 
-[=encryption-immutable=] -- a Collection update tried to change the `scheme`,
+[=encryption-immutable=] -- a Collection update tried to add an `encryption`
+descriptor to a Collection that lacks one, or to change the `scheme`,
 decrease or remove the `version`, or clear an
-existing `encryption` descriptor (it is set-once, version-monotonic; see
-[[[#collection-metadata-data-model]]]):
+existing descriptor (it is creation-only, version-monotonic; see
+[[[#creation-only-members]]]):
 
 ```http
 HTTP/1.1 409 Conflict
@@ -5518,6 +5729,42 @@ Content-type: application/problem+json
 {
   "type": "https://w3id.org/pws#encryption-immutable",
   "title": "Collection encryption descriptor is immutable."
+}
+```
+
+[=revisions-immutable=] -- a Collection update tried to add, change or clear
+`revisions.resolution` or `revisions.immutable` (both are creation-only; see
+[[[#creation-only-members]]]):
+
+```http
+HTTP/1.1 409 Conflict
+Content-type: application/problem+json
+
+{
+  "type": "https://w3id.org/pws#revisions-immutable",
+  "title": "Collection revisions descriptor is immutable.",
+  "errors": [
+    {
+      "detail": "Collection \"revisions.immutable\" is declared only when the Collection is created; it cannot be set afterward.",
+      "pointer": "#/revisions/immutable"
+    }
+  ]
+}
+```
+
+[=resource-immutable=] -- a write into a write-once Collection targeted an id
+that already holds a Resource, with a body that does not repeat the stored
+representation (see the `revisions` member of
+[[[#collection-metadata-data-model]]]):
+
+```http
+HTTP/1.1 409 Conflict
+Content-type: application/problem+json
+
+{
+  "type": "https://w3id.org/pws#resource-immutable",
+  "title": "Update Resource refused: the Collection is immutable.",
+  "detail": "This Collection is write-once: a stored Resource or chunk cannot be changed. Only a repeat of the stored bytes is accepted."
 }
 ```
 
