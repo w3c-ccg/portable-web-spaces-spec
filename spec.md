@@ -123,6 +123,12 @@ This subsection is non-normative.
     entry carries its own `checkpoint`. A server rejects a retired object
     checkpoint, and the replica restarts its pull from the beginning (see
     [[[#query-profile-changes]]]).
+  * Clarify URL construction rules (URLs should not be constructed from root).
+    Earlier text wrote `/space/{space_id}/` and `/spaces/` as peers under one
+    server root, and clients took that as license to build a Space URL by
+    appending to the parent of the Spaces Repository URL. A client now obtains a
+    Space URL only from `Location` on creation, from a document that names it,
+    or by resolving a self-locating DID (see [[[#reading-this-document]]]).
 
 No stored data moves across the v0.4-to-v0.5 path changes. The durable
 artifacts to audit are capabilities. A delegated capability whose
@@ -156,10 +162,10 @@ a different operation, and a [=server=] SHOULD answer it with a
 `308 Permanent Redirect` to the canonical form. No two paths defined by this
 specification differ only by a trailing slash. Because a signed capability
 invocation covers the full request URL (see
-[Capability Invocation](https://w3c-ccg.github.io/portable-web-spaces-spec/authz-profile/#capability-invocation) in [[PWS-AUTHZ]]), a
-client that follows such a redirect
-MUST sign again for the new target rather than replay its `Authorization`
-header; sending the canonical form to begin with avoids the round trip.
+[Capability Invocation](https://w3c-ccg.github.io/portable-web-spaces-spec/authz-profile/#capability-invocation)
+in [[PWS-AUTHZ]]), a client that follows such a redirect MUST sign again for the
+new target rather than replay its `Authorization` header; sending the canonical
+form to begin with avoids the round trip.
 
 **A container's description lives at its `meta` sub-resource.** `GET` on a
 container lists its members and `POST` adds one, at every level: a Space's
@@ -175,13 +181,26 @@ description is therefore always a `GET` of `meta`. The one exception is the
 [=service description=], found by following the `service` link every response
 carries (see [[[#service-description]]]).
 
-**Paths are relative to a server root, which may be a subpath.** Every path in
-this document, `/space/{space_id}/...` and `/spaces/`, is written from the
-[=server=]'s root. That root is not necessarily an origin: a server MAY be
-mounted under a path such as `https://example.com/pws/`. A client cannot
-derive the root from a URL it holds, which is why the service description is
-linked rather than placed at a fixed path, and why every URL the service
-description carries is absolute.
+**Clients must not assume that `/space/{space_id}/`, `/spaces/`, or `/service`
+endpoints are mounted under the origin's root, or are peer to each other.**
+These URLs need to be received or discovered instead of constructed by the
+client. A [=server=] and its endpoints MAY be mounted under any path of an
+origin, such as `https://example.com/pws/`, the Spaces Repository is optional,
+and nothing in this specification places `/space/{space_id}/` beside `/spaces/`.
+
+* `/spaces/` repository URL: given directly to client out of band, or discovered
+  by following the `spaces` link in the `/service` description response.
+* `/space/{space_id}/` URL: given directly to client out of band, obtained via
+  `Location` response header on creation, or from a document returned by the
+  server (a List Spaces item, a Metadata object, or a linkset).
+* `/service` description endpoint: given directly to client out of band, or
+  discovered by following the `service` link relation response header on any
+  PWS API request (see [[[#discovering-the-service-description]]]).
+
+A client must not assemble a Space URL from a URL it holds, such as by appending
+`space/{space_id}/` to the parent of the Spaces Repository URL. Everything
+beneath a Space is derived from the Space URL as the hierarchy defines it, and
+from nothing above it.
 
 **All examples share one Space.** Every example in this document uses the Space
 id `81246131-69a4-45ab-9bff-9c946b59cf2e` on the host `example.com`. Path
@@ -1286,10 +1305,23 @@ the server lists the old version.
 
 A Spaces Repository is a set of API endpoints that supports the creation and
 management of multiple spaces on a given [=server=].
-This `/spaces/` set of API endpoints is optional. If a server does not support
+This `/spaces/` set of API endpoints is OPTIONAL. If a server does not support
 this feature (for example, if it is a single-tenant server with an existing
 hardcoded Space), then it can implement only the `/space/{space_id}/` endpoints
 and get most of the functionality of this specification.
+
+### Spaces Endpoint Discovery {#spaces-endpoint-discovery}
+
+A client finds the Spaces Repository URL through one of the following:
+
+* is given the full Spaces Repository URL, out of band (such as via an
+  onboarding link or QR code)
+* discovers the URL from the `spaces` member of the
+  [=service description=] (see [[[#service-description-data-model]]]),
+
+Clients MUST NOT assume that the `/spaces/` path is mounted at the root of the
+server, nor assume that it is located on the same peer level as the
+`/space/{space_id}/` path.
 
 <div class="ednote">
 The Spaces Repository endpoints are a candidate for extraction into a
@@ -1333,6 +1365,12 @@ To create a Space:
   - a proof of payment
   - a proof of membership in an organization
 
+* The success response MUST carry the new Space's absolute URL in its
+  `Location` response header. That header is how the client learns where the
+  Space lives: the server chooses the URL, and the client keeps it and derives
+  every Collection and Resource URL beneath it from it (see
+  [[[#reading-this-document]]]).
+
 #### (HTTP API) POST `/spaces/` {#http-api-post-spaces}
 
 To create a space via HTTP API using the Spaces Repository POST API:
@@ -1356,6 +1394,7 @@ Example success response:
 ```http
 HTTP/1.1 201 Created
 Content-type: application/json
+Link: <https://example.com/pws/service>; rel="service"
 Location: https://example.com/space/81246131-69a4-45ab-9bff-9c946b59cf2e/
 
 {
@@ -1450,7 +1489,9 @@ disclose those remains provider-defined.
 * Each entry in `items` MUST carry the space's `id`, `url`, and `type`. The
   `type` value is the same array as the `type` of the space's Metadata object
   (see [[[#space-metadata-data-model]]]), so a client can tell spaces apart by
-  type without reading each one.
+  type without reading each one. The `url` is the Space URL as the server
+  names it; a client that holds only a listed `id` has no way to reach the
+  Space (see [[[#reading-this-document]]]).
 
 * No query parameter selects which types are listed. The listing depends only
   on what the requester is authorized to see.
@@ -3712,6 +3753,11 @@ property, from the following:
 * The Space Metadata object, see [[[#space-metadata-data-model]]].
 * The Collection Metadata object, see [[[#collection-metadata-data-model]]].
 
+A linkset's `anchor` is the URL of the container it describes, and each
+`href` is a URL the server names. A client follows these values as the server
+gives them; it does not rebuild them from a root of its own (see
+[[[#reading-this-document]]]).
+
 ### Space Linkset {#space-linkset}
 
 The space `linkset` resource (one of the [[[#space-level-reserved-endpoints]]]),
@@ -4336,14 +4382,25 @@ document never changes.
 A verified-log method; the rules of [[[#verified-log-did-methods]]] apply.
 
 History layout. The history is the method's `did.jsonl` log. Self-hosted,
-the DID `did:webvh:{scid}:{host}:space:{space_id}:{collection_id}` resolves
-from the Resource at `https://{host}/space/{space_id}/{collection_id}/did.jsonl`
-under the method's standard DID-to-HTTPS transformation. The `{collection_id}`
-is any Collection id; PWS Collection ids are restricted to characters the
-method's path encoding leaves untouched, so the mapping is direct. A server
-that accepts `did:webvh` controllers accepts a moved log whose current id is
-self-hosted. The log's earlier entries may name a different host or Space; what
-the server verifies is the log as it stands under its current id.
+the DID has the form
+`did:webvh:{scid}:{host}:{prefix_segment}:...:space:{space_id}:{collection_id}`,
+and resolves from the Resource at
+`https://{host}/{prefix_segment}/.../space/{space_id}/{collection_id}/did.jsonl`
+under the method's standard DID-to-HTTPS transformation. Each colon-separated
+segment after `{host}` is one path segment of the log's URL. The
+`{prefix_segment}` segments are the path under which the [=server=] is
+mounted, and there are none when the server is mounted at the origin root,
+in which case the DID is `did:webvh:{scid}:{host}:space:{space_id}:{collection_id}`
+and resolves from `https://{host}/space/{space_id}/{collection_id}/did.jsonl`.
+The DID is therefore self-locating: its segments name the log's URL in full,
+and the Space URL is the parent of the history Collection's URL, so a client
+holding the DID needs no other input to find either (see
+[[[#reading-this-document]]]). The `{collection_id}` is any Collection id;
+PWS Collection ids are restricted to characters the method's path encoding
+leaves untouched, so the mapping is direct. A server that accepts
+`did:webvh` controllers accepts a moved log whose current id is self-hosted.
+The log's earlier entries may name a different host, mount path, or Space;
+what the server verifies is the log as it stands under its current id.
 
 Verification. Before using the resolved document the server MUST verify the
 log as the method's specification defines: the SCID is checked against the
