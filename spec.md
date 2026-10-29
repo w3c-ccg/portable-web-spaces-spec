@@ -1641,8 +1641,9 @@ of this object. A server MUST answer a `PUT` at the Space URL with
 `Space` properties:
 
 * `id` - A unique identifier for a space at a given [=server=]. Created by the
-  server if not provided. Note: the `{space_id}` template parameter used in URL
-  templates in this spec MUST match that space's `id` property. See
+  server if not provided. Absent at a single fixed Space, which has no Space id
+  (see [[[#single-fixed-space]]]). Note: the `{space_id}` template parameter
+  used in URL templates in this spec MUST match that space's `id` property. See
   [[[#identifiers]]] for additional constraints.
 * `type` - An array of strings, MUST include the type `Space`. The array SHOULD
   be lexically sorted so that the object has a canonical, stable serialization
