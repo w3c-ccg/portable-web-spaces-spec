@@ -123,12 +123,18 @@ This subsection is non-normative.
     entry carries its own `checkpoint`. A server rejects a retired object
     checkpoint, and the replica restarts its pull from the beginning (see
     [[[#query-profile-changes]]]).
-  * Clarify URL construction rules (URLs should not be constructed from root).
-    Earlier text wrote `/space/{space_id}/` and `/spaces/` as peers under one
-    server root, and clients took that as license to build a Space URL by
-    appending to the parent of the Spaces Repository URL. A client now obtains a
-    Space URL only from `Location` on creation, from a document that names it,
-    or by resolving a self-locating DID (see [[[#reading-this-document]]]).
+  * Fix the server-level URL layout under a [=base server URL=]. Earlier text
+    wrote `/space/{space_id}/` and `/spaces/` from an unstated server root and
+    left the service description at no fixed path. The three server-level
+    endpoints are now defined as `{base}service`, `{base}spaces/` and
+    `{base}space/{space_id}/`, where the base server URL is any URL ending in
+    `/`, so a client that holds the base constructs all three and a client that
+    holds a did:webvh minted under this layout derives the base from it. A
+    server that is one Space with no id has no base server URL; its Space URL is
+    given to the client and the service description is found through the
+    `service` link (see [[[#server-discovery]]]). The segments `service`,
+    `spaces` and `space` become reserved Collection ids at a Space served from
+    an origin root (see [[[#space-level-reserved-endpoints]]]).
 
 No stored data moves across the v0.4-to-v0.5 path changes. The durable
 artifacts to audit are capabilities. A delegated capability whose
@@ -181,26 +187,13 @@ description is therefore always a `GET` of `meta`. The one exception is the
 [=service description=], found by following the `service` link every response
 carries (see [[[#service-description]]]).
 
-**Clients must not assume that `/space/{space_id}/`, `/spaces/`, or `/service`
-endpoints are mounted under the origin's root, or are peer to each other.**
-These URLs need to be received or discovered instead of constructed by the
-client. A [=server=] and its endpoints MAY be mounted under any path of an
-origin, such as `https://example.com/pws/`, the Spaces Repository is optional,
-and nothing in this specification places `/space/{space_id}/` beside `/spaces/`.
-
-* `/spaces/` repository URL: given directly to client out of band, or discovered
-  by following the `spaces` link in the `/service` description response.
-* `/space/{space_id}/` URL: given directly to client out of band, obtained via
-  `Location` response header on creation, or from a document returned by the
-  server (a List Spaces item, a Metadata object, or a linkset).
-* `/service` description endpoint: given directly to client out of band, or
-  discovered by following the `service` link relation response header on any
-  PWS API request (see [[[#discovering-the-service-description]]]).
-
-A client must not assemble a Space URL from a URL it holds, such as by appending
-`space/{space_id}/` to the parent of the Spaces Repository URL. Everything
-beneath a Space is derived from the Space URL as the hierarchy defines it, and
-from nothing above it.
+**Paths are written from the base server URL.** The paths in this document,
+`/space/{space_id}/...` and `/spaces/`, are relative to the server's
+[=base server URL=], which may be an origin root or any path beneath one. A
+server mounted under `https://example.com/pws/` serves
+`https://example.com/pws/space/{space_id}/`. The layout, the single fixed Space
+that has no base server URL, and how a client finds either are defined in
+[[[#server-discovery]]].
 
 **All examples share one Space.** Every example in this document uses the Space
 id `81246131-69a4-45ab-9bff-9c946b59cf2e` on the host `example.com`. Path
@@ -971,6 +964,72 @@ one page of items at a time using the cursor-based profile defined in Appendix
 a single response is conformant, and a client MUST be prepared for either
 behavior.
 
+## Server Discovery {#server-discovery}
+
+A client reaches a [=server=] from one URL it holds: a [=base server URL=], a
+Space URL, or any other PWS URL it has come across. This section defines how
+the server-level endpoints are laid out, so that a client holding the base can
+construct them; how a server that is a single fixed Space differs; and that a
+URL a client receives is used as given. How a client that holds no base finds
+the [=service description=] is defined in
+[[[#discovering-the-service-description]]].
+
+### Server Layout {#server-layout}
+
+A [=server=] that addresses Spaces by id (see
+[[[#scope-and-conformance-profiles]]]) publishes them under a single
+<dfn data-lt="base server URLs">base server URL</dfn>: an absolute URL
+that ends in `/` and has no query or fragment. It MAY be an origin root
+(`https://example.com/`) or any path beneath one (`https://example.com/pws/`).
+Writing the base server URL as `{base}`, the server-level endpoints are:
+
+* `{base}service` -- the [=service description=] (see
+  [[[#service-description]]]);
+* `{base}spaces/` -- the Spaces Repository, when the server implements one (see
+  [[[#spaces-repositories]]]);
+* `{base}space/{space_id}/` -- a Space.
+
+A server MUST serve these three at those paths, on the same level. A client that
+holds the base MAY construct any of them, and a client that holds any one of
+them MAY derive the base by removing the segments this layout adds.
+
+<div class="note" title="Templates are illustrative">
+
+The `{base}...` templates above, and the `/space/{space_id}/...` paths used
+throughout this document, show which segments the layout adds and in what
+order. They are not a recipe for string assembly. An implementation that
+derives one URL from another SHOULD use a URL parser and resolver (for example
+the WHATWG `URL` constructor, `new URL(relative, base)`) rather than
+concatenating strings. Concatenation gets the details wrong that a resolver
+handles: a base with or without a trailing slash, a segment that needs
+percent-encoding, a segment such as `..` or an empty one, and a query or
+fragment on the input.
+
+</div>
+
+### Single Fixed Space {#single-fixed-space}
+
+A server that is one Space with no Space id (for example a personal site whose
+Collections are `https://alice.example/posts/` and
+`https://alice.example/images/`) has no base server URL and does not use the
+layout of [[[#server-layout]]]. Its Space URL is given to the client, and its
+service description is reached only through the `service` link every response
+carries (see [[[#discovering-the-service-description]]]). When such a Space is
+served from an origin root, the first path segment is a Collection id, so the
+segments `service`, `spaces` and `space` are reserved there (see
+[[[#space-level-reserved-endpoints]]]).
+
+### Received URLs {#received-urls}
+
+A Space URL a client receives is authoritative whatever its form. A client
+obtains one from the `Location` header on creation, from a document the server
+returns (a List Spaces item, a Metadata object, a linkset), from a capability's
+invocation target, from a self-locating DID (see
+[[[#did-webvh-controller-profile]]]), or out of band, and uses it as given.
+Everything beneath a Space is derived from the Space URL as the hierarchy
+defines it. A client MUST NOT rewrite a received URL to fit
+[[[#server-layout]]]; a grant or a DID may name a Space on another server.
+
 ## Service Description {#service-description}
 
 A [=server=] publishes one [=service description=]: a JSON document, readable
@@ -989,13 +1048,13 @@ version must be able to read, so its own format is frozen: a future version of
 this specification may add members to it but MUST NOT rename, remove, or
 change the type of a member defined here.
 
-The service description has no fixed path. A [=server=] MAY be mounted under
-any path of an origin, and a client that holds a PWS URL cannot derive the
-server root from it, so the document is found by following a link rather than
-by convention (see [[[#discovering-the-service-description]]]). This is the
-deliberate exception to the "description lives at `meta`" convention of
-[[[#reading-this-document]]]: the server level has no container URL of its
-own to hang a `meta` segment on.
+A [=server=] with a [=base server URL=] serves the description at `{base}service`
+(see [[[#server-layout]]]). A client that holds the base reads it there
+directly. A client that holds some other PWS URL, or is speaking to a single
+fixed Space that has no base server URL, finds it by following a link (see
+[[[#discovering-the-service-description]]]). This is the deliberate exception to
+the "description lives at `meta`" convention of [[[#reading-this-document]]]:
+the server level has no container URL of its own to hang a `meta` segment on.
 
 ### Discovering the Service Description {#discovering-the-service-description}
 
@@ -1025,9 +1084,11 @@ CORS requirements apply:
   `Access-Control-Allow-Origin: *`, since it is fetched anonymously and
   cross-origin.
 
-The discovery flow is therefore two requests from any PWS URL a client has
-come across (a link to a shared Resource, a public Collection, a service
-endpoint in a DID document):
+A client that holds a [=base server URL=] needs no discovery to construct the
+service description endpoint: the description is at `{base}service`. The `Link`
+relation method serves a client that holds any other PWS URL (a link to a
+shared Resource, a public Collection, the Space URL of a single fixed Space, a
+service endpoint in a DID document). From such a URL the flow is two requests:
 
 1. `HEAD` the URL. The response status does not matter; the client reads the
    `Link` header's `service` target.
@@ -1050,8 +1111,11 @@ speaking v0.4.
 
 The service description is a JSON object with the following members:
 
-* `url` (required) - The service description's own canonical URL, so that a
-  copy of the document (from a cache, or a DID document) can be refetched.
+* * `url` (required) - The service description's own canonical URL, so that a
+  copy of the document (from a cache, or a DID document) can be refetched. On a
+  server with a [=base server URL=] it is `{base}service`. A client that reached
+  the document from a base it holds SHOULD compare the two and treat a mismatch
+  as a misconfigured server rather than adopt the advertised URL.
 * `specs` (required) - An object whose keys are specification identifiers and
   whose values are arrays of [=version entries=], one per version of that
   specification the server implements. A specification is listed at every
@@ -1108,7 +1172,9 @@ specification does not enumerate them.
 `https://w3id.org/pws` carries, in addition to `version` and `url`:
 
 * `spaces` (optional) - The absolute URL of the Spaces Repository (see
-  [[[#spaces-repositories]]]). Absent when the server does not implement it.
+  [[[#spaces-repositories]]]), which is `{base}spaces/`. Absent when the
+  server does not implement it. A client that holds the base SHOULD compare
+  the two as it does for `url`.
 * `features` (optional) - An array of feature tokens naming the OPTIONAL
   sections of this specification the server implements, beyond the Minimal
   profile: the vocabulary is open and additive, a client MUST ignore tokens
@@ -1304,24 +1370,25 @@ the server lists the old version.
 ## Spaces Repositories {#spaces-repositories}
 
 A Spaces Repository is a set of API endpoints that supports the creation and
-management of multiple spaces on a given [=server=].
-This `/spaces/` set of API endpoints is OPTIONAL. If a server does not support
-this feature (for example, if it is a single-tenant server with an existing
-hardcoded Space), then it can implement only the `/space/{space_id}/` endpoints
+management of multiple spaces on a given [=server=]. This `/spaces/` set of API
+endpoints is OPTIONAL. A server that does not support it can implement only the
+`/space/{space_id}/` endpoints under its [=base server URL=], or be a single
+fixed Space with no base server URL at all (see [[[#single-fixed-space]]]),
 and get most of the functionality of this specification.
 
-### Spaces Endpoint Discovery {#spaces-endpoint-discovery}
+### Spaces Repository Location {#spaces-repository-location}
 
-A client finds the Spaces Repository URL through one of the following:
+The Spaces Repository is served at `{base}spaces/`, beside `{base}service` and
+`{base}space/{space_id}/` (see [[[#server-layout]]]). A client reaches
+it in one of the following ways:
 
-* is given the full Spaces Repository URL, out of band (such as via an
-  onboarding link or QR code)
-* discovers the URL from the `spaces` member of the
-  [=service description=] (see [[[#service-description-data-model]]]),
-
-Clients MUST NOT assume that the `/spaces/` path is mounted at the root of the
-server, nor assume that it is located on the same peer level as the
-`/space/{space_id}/` path.
+* * it holds the server's [=base server URL=] (for example from an onboarding
+  link or QR code) and appends `spaces/`;
+* it is given the full Spaces Repository URL out of band, and MAY derive the
+  base from it by removing the final `spaces/` segment;
+* it reads the `spaces` member of the [=service description=] (see
+  [[[#service-description-data-model]]]). A server that does not implement the
+  Repository omits the member, which is how a client tells the two apart.
 
 <div class="ednote">
 The Spaces Repository endpoints are a candidate for extraction into a
@@ -1369,7 +1436,7 @@ To create a Space:
   `Location` response header. That header is how the client learns where the
   Space lives: the server chooses the URL, and the client keeps it and derives
   every Collection and Resource URL beneath it from it (see
-  [[[#reading-this-document]]]).
+  [[[#received-urls]]]).
 
 #### (HTTP API) POST `/spaces/` {#http-api-post-spaces}
 
@@ -1490,8 +1557,8 @@ disclose those remains provider-defined.
   `type` value is the same array as the `type` of the space's Metadata object
   (see [[[#space-metadata-data-model]]]), so a client can tell spaces apart by
   type without reading each one. The `url` is the Space URL as the server
-  names it; a client that holds only a listed `id` has no way to reach the
-  Space (see [[[#reading-this-document]]]).
+  names it, `{base}space/{id}/` under [[[#server-layout]]]; it is carried so
+  that a client can open a listed Space without assembling the URL itself.
 
 * No query parameter selects which types are listed. The listing depends only
   on what the requester is authorized to see.
@@ -3756,7 +3823,7 @@ property, from the following:
 A linkset's `anchor` is the URL of the container it describes, and each
 `href` is a URL the server names. A client follows these values as the server
 gives them; it does not rebuild them from a root of its own (see
-[[[#reading-this-document]]]).
+[[[#received-urls]]]).
 
 ### Space Linkset {#space-linkset}
 
@@ -4393,11 +4460,13 @@ mounted, and there are none when the server is mounted at the origin root,
 in which case the DID is `did:webvh:{scid}:{host}:space:{space_id}:{collection_id}`
 and resolves from `https://{host}/space/{space_id}/{collection_id}/did.jsonl`.
 The DID is therefore self-locating: its segments name the log's URL in full,
-and the Space URL is the parent of the history Collection's URL, so a client
-holding the DID needs no other input to find either (see
-[[[#reading-this-document]]]). The `{collection_id}` is any Collection id;
-PWS Collection ids are restricted to characters the method's path encoding
-leaves untouched, so the mapping is direct. A server that accepts
+the Space URL is the parent of the history Collection's URL, and under the
+layout of [[[#server-layout]]] the server's [=base server URL=] is
+`https://{host}/{prefix_segment}/.../`, the parent of the `space` segment. A
+client holding the DID needs no other input to find any of the three. The
+`{collection_id}` is any Collection id; PWS Collection ids are restricted to
+characters the method's path encoding leaves untouched, so the mapping is
+direct. A server that accepts
 `did:webvh` controllers accepts a moved log whose current id is self-hosted.
 The log's earlier entries may name a different host, mount path, or Space;
 what the server verifies is the log as it stands under its current id.
@@ -4475,6 +4544,13 @@ collections `id`s MUST NOT collide with the corresponding reserved segments.
 
 If a client attempts to create a collection with an `id` that collides with a
 reserved segment list above, the server MUST return a 409 Conflict error.
+
+A single fixed Space served from an origin root (see
+[[[#single-fixed-space]]]) places its Collections at the first path segment,
+where a server with a [=base server URL=] places `service`, `spaces` and
+`space`. Those three segments are reserved as Collection ids at such a Space,
+under the same 409 rule, so that the Space can later move under a base without a
+Collection standing where the layout expects an endpoint.
 
 ### Collection-level reserved endpoints {#collection-level-reserved-endpoints}
 
