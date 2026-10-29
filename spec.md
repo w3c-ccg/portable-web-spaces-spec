@@ -86,6 +86,11 @@ This subsection is non-normative.
     Resource. That operation can no longer respond with [=reserved-id=]
     either, since a reserved segment in the Resource position is a reserved
     endpoint (see [[[#methods-at-reserved-endpoints]]]).
+  * Update (or Create by Id) Collection likewise no longer responds with
+    [=reserved-id=]. A URL with a reserved segment in the Collection position
+    is a request to that reserved endpoint, and a path beneath it that no
+    endpoint defines is `404 Not Found`. [=reserved-id=] is now raised only
+    for an `id` a client supplies in a request body.
   * A server publishes a [=service description=] listing every specification
     version it speaks, found through a `Link: <...>; rel="service"` header on
     every response (see [[[#service-description]]]). Serving it is REQUIRED,
@@ -1564,8 +1569,7 @@ the container of the Space's Collections (see
 [[[#list-all-collections-operation]]]).
 
 Because the `meta` segment occupies the `{collection_id}` position, `meta` is a
-reserved Collection id: creating a Collection with the id `meta` is a
-[=reserved-id=] conflict (see [[[#reserved-path-segment-registry]]]).
+reserved Collection id (see [[[#reserved-path-segment-registry]]]).
 
 `PUT` is not defined at the Space URL itself; the replacement write is a `PUT`
 of this object. A server MUST answer a `PUT` at the Space URL with
@@ -2467,7 +2471,14 @@ Errors (see [[[#error-type-registry]]] for canonical examples):
 A `PUT` of a Collection's Metadata object is a full replacement of that object,
 and creates the Collection when none exists under that `id`. The client
 specifies the `id` of the Collection in the request URL; it MUST NOT collide
-with the list of [[[#space-level-reserved-endpoints]]].
+with the list of [[[#space-level-reserved-endpoints]]]. A request URL whose
+`{collection_id}` position holds a reserved segment is a request for that
+reserved endpoint's subtree, not for a Collection. A path there that no
+endpoint defines is not found (404), and a method an endpoint does not
+implement is refused with `405 Method Not Allowed` (see
+[[[#methods-at-reserved-endpoints]]]). So this operation never answers
+[=reserved-id=]. That error belongs to a client-supplied `id` in a request
+body (see [[[#create-collection-add-collection-to-a-space-operation]]]).
 
 * Requires appropriate authorization: a root capability invoked directly by
   the space's [=controller=]. Exception: a delegated capability MAY
@@ -2561,9 +2572,6 @@ Errors (see [[[#error-type-registry]]] for canonical examples):
 * [=not-found=] (404) -- the caller has missing or insufficient authorization,
   per [[[#error-handling]]]. A Collection that does not exist is created by
   this operation rather than being an error.
-* [=reserved-id=] (409) -- the supplied Collection `id` collides with one of the
-  [[[#space-level-reserved-endpoints]]] (for example, `collections` or
-  `linkset`).
 * [=encryption-immutable=] (409) -- the update tried to change the `scheme`,
   decrease or remove the `version`, or clear an existing `encryption`
   descriptor (the descriptor is set-once, version-monotonic; see
@@ -4473,8 +4481,12 @@ collections `id`s MUST NOT collide with the corresponding reserved segments.
 | `/space/{space_id}/query`       | `query`          | Reserved for cross-collection queries  |
 | `/space/{space_id}/quotas`      | `quotas`         | Reserved for per-backend quota report  |
 
-If a client attempts to create a collection with an `id` that collides with a
-reserved segment list above, the server MUST return a 409 Conflict error.
+The collision rule applies where the client names the Collection `id` in a
+request body. A [[[#create-collection-add-collection-to-a-space-operation]]]
+request whose `id` collides with a reserved segment above MUST be refused with
+a [=reserved-id=] (409) error. A request URL that holds a reserved segment in the `{collection_id}`
+position is instead a request to that reserved endpoint (see
+[[[#methods-at-reserved-endpoints]]]).
 
 ### Collection-level reserved endpoints {#collection-level-reserved-endpoints}
 
@@ -4494,8 +4506,11 @@ corresponding reserved segments.
 | `/space/{space_id}/{collection_id}/query`    | `query`          | Query resources within a collection (see [[[#query-profile-registry]]]) |
 | `/space/{space_id}/{collection_id}/quota`    | `quota`          | Storage quota report for collection |
 
-If a client attempts to create a resource with an `id` that collides with a
-reserved segment list above, the server MUST return a 409 Conflict error.
+A Resource `id` is chosen only in a request URL (see
+[[[#update-or-create-by-id-resource-operation]]]), so no request names a
+Resource `id` in a body and no Resource operation answers [=reserved-id=]. A
+request URL that holds a reserved segment in the `{resource_id}` position is a
+request to that reserved endpoint (see [[[#methods-at-reserved-endpoints]]]).
 
 ### Resource-level reserved endpoints {#resource-level-reserved-endpoints}
 
@@ -4545,6 +4560,18 @@ Collection, or Resource named in the path exists. So the answer reveals
 nothing the [=not-found=] rule protects (see [[[#error-handling]]]). A server
 MUST NOT treat such a request as an operation on a Collection or Resource
 whose id is the reserved segment.
+
+The same holds one level further down. A path beneath a reserved segment that
+no endpoint defines (for example, `/space/{space_id}/export/meta` or
+`/space/{space_id}/{collection_id}/policy/meta`) lies inside the reserved
+endpoint's subtree and names nothing. A server MUST answer such a request with
+`404 Not Found`, whatever the method, and MUST NOT read the reserved segment
+as a Collection or Resource id. Like the 405, this answer does not depend on
+whether the Space, Collection, or Resource named in the path exists, and it
+is not a [=reserved-id=] error. That error is reserved for an `id` a client
+supplies in a request body. This 404 has no entry in the Error Type Registry
+either; a problem body, where a server sends one, uses [[RFC9457]]'s
+`about:blank` type.
 
 This refusal has no entry in the Error Type Registry. Its meaning is the HTTP
 status alone. A problem body, where a server sends one, uses [[RFC9457]]'s
