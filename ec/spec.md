@@ -1152,7 +1152,12 @@ resource MUST therefore finish the write by updating the parent resource's own
 content (its envelope; see [[[#chunked-envelopes]]]) after its chunks are
 stored: that final resource write is what surfaces the change to replicating
 readers. A client that mutates a resource purely through its chunks never
-appears on the feed.
+appears on the feed. A replicating server carries the chunk set with the
+parent write it surfaces: when a replicated resource's parent write applies,
+the server reads that resource's chunk listing and each chunk, and stores the
+set together with that parent revision, as one unit. A chunk-only mutation
+stays on the server where it was made until the resource's parent is next
+written.
 
 ### Chunk authorization {#chunk-authorization}
 
