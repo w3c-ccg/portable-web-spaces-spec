@@ -129,6 +129,8 @@ This subsection is non-normative.
     `revisions` member (the conflict model and the write-once rule), whose
     `resolution` and `immutable` are creation-only too (see
     [[[#collection-metadata-data-model]]]).
+* **v0.6** (November 2026 - now) -- Write stamps and replication between
+  servers. Breaking changes so far:
   * Replication between servers is specified in a companion document,
     [[PWS-REPLICATION]]. This document gains the `replicas` and `zcaps`
     reserved segments (a Collection already named either is hidden under
