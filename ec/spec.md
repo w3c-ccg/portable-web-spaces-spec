@@ -72,7 +72,7 @@ defines.
 ### The single epoch era {#single-epoch-era}
 
 This profile has exactly one [=era=]. An encrypted collection's
-[descriptor](https://w3c-ccg.github.io/portable-web-spaces-spec/#collection-data-model)
+[descriptor](https://w3c-ccg.github.io/portable-web-spaces-spec/#collection-metadata-data-model)
 carries a key-epoch roster from the moment the collection exists, and every
 envelope seals to an epoch key and binds the epoch it sealed under. There is
 no descriptor-less era, no epoch-less envelope, and consequently no
