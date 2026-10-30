@@ -123,6 +123,8 @@ This subsection is non-normative.
     entry carries its own `checkpoint`. A server rejects a retired object
     checkpoint, and the replica restarts its pull from the beginning (see
     [[[#query-profile-changes]]]).
+* **v0.6** (November 2026 - now) -- Write stamps and replication between
+  servers. Breaking changes so far:
   * Replication between servers is specified in a companion document,
     [[PWS-REPLICATION]]. This document gains the `replicas` and `zcaps`
     reserved segments (a Collection already named either is hidden under
