@@ -18,7 +18,10 @@ Markdown](https://respec.org/docs/#markdown) format), and its companion
 zCap authorization profile and the `PublicCanRead` policy type, and
 [Encrypted Collections for Portable Web Spaces](https://w3c-ccg.github.io/portable-web-spaces-spec/ec/)
 (source in [`ec/`](./ec/)), the client-side profile for end-to-end encrypted
-Collections.
+Collections, and
+[Replication for Portable Web Spaces](https://w3c-ccg.github.io/portable-web-spaces-spec/replication/)
+(source in [`replication/`](./replication/)), the pull-only transport that
+keeps a Space converged across servers.
 
 For LLM consumption, [`llms.txt`](llms.txt) summarizes the spec and links to its
 full text, following the [llmstxt.org](https://llmstxt.org/) convention.
@@ -73,7 +76,9 @@ The specification source is in [`spec.md`](./spec.md), in
 profile's source is [`authz-profile/authz-profile.md`](./authz-profile/authz-profile.md),
 with its own ReSpec shell at [`authz-profile/index.html`](./authz-profile/index.html).
 The Encrypted Collections profile's source is [`ec/spec.md`](./ec/spec.md),
-with its ReSpec shell at [`ec/index.html`](./ec/index.html).
+with its ReSpec shell at [`ec/index.html`](./ec/index.html). The Replication
+profile's source is [`replication/spec.md`](./replication/spec.md), with its
+ReSpec shell at [`replication/index.html`](./replication/index.html).
 
 ### Testing
 
@@ -88,7 +93,8 @@ http-server ./
 The published site is built by [`.github/workflows/publish.yml`](.github/workflows/publish.yml)
 on every push to `main`, and deployed to GitHub Pages. The workflow runs the
 [ReSpec CLI](https://respec.org/docs/#respec-cli) over `index.html`,
-`authz-profile/index.html`, and `ec/index.html` and publishes:
+`authz-profile/index.html`, `ec/index.html`, and `replication/index.html` and
+publishes:
 
 | Path                              | Contents                                                                                                                             |
 |-----------------------------------|--------------------------------------------------------------------------------------------------------------------------------------|
@@ -102,6 +108,9 @@ on every push to `main`, and deployed to GitHub Pages. The workflow runs the
 | `/ec/`                            | A static snapshot of the Encrypted Collections profile.                                                                              |
 | `/ec/live/`                       | The Encrypted Collections profile's ReSpec page, rendered client-side.                                                               |
 | `/ec/spec.md`                     | The Encrypted Collections profile's Markdown source.                                                                                 |
+| `/replication/`                   | A static snapshot of the Replication profile.                                                                                        |
+| `/replication/live/`              | The Replication profile's ReSpec page, rendered client-side.                                                                         |
+| `/replication/spec.md`            | The Replication profile's Markdown source.                                                                                           |
 
 Pull requests build the snapshot as a check but do not deploy it. To render a
 snapshot yourself:
@@ -110,6 +119,7 @@ snapshot yourself:
 npx respec@latest --src index.html --out snapshot.html --localhost
 (cd authz-profile && npx respec@latest --src index.html --out ../authz-snapshot.html --localhost)
 (cd ec && npx respec@latest --src index.html --out ../ec-snapshot.html --localhost)
+(cd replication && npx respec@latest --src index.html --out ../replication-snapshot.html --localhost)
 ```
 
 The repository's Pages source must be set to **GitHub Actions** (rather than
