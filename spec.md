@@ -1056,9 +1056,9 @@ specification family, and the [=version entries=] under it carry the versions.
 This specification's identifier is `https://w3id.org/pws`.
 
 <div class="ednote">
-The identifier above is provisional: it is registered by the rename this
-document is pending (see [[[#version-history]]]) and may change with it before
-v0.5 is final.
+The identifier above is provisional until its `w3id.org` redirect is
+registered. It is not expected to change, but a server should treat the
+registered value as the one of record.
 </div>
 
 **Version entries.** A <dfn data-lt="version entry|version entries">version
@@ -4350,25 +4350,6 @@ log as the method's specification defines: the SCID is checked against the
 log's first entry, the hash chain of entries is verified, pre-rotation
 commitments (`nextKeyHashes`) are enforced, and each entry's proof is
 verified against the update keys authorized by the entry before it.
-
-</section>
-
-<section class="appendix normative">
-
-## Policy Type Registry {#policy-type-registry}
-
-This appendix is normative.
-
-This registry lists the `type` values an access control [=policy=] may carry
-(see [[[#access-control-policies]]]) and the specification that defines each
-one. A [=server=] evaluates a policy by looking its `type` up here. A `type`
-not in this registry is unrecognized and grants nothing, per the fail-closed
-rule. Registering a type adds a row naming the specification that defines
-it; this specification defines no policy type itself.
-
-| `type`          | Grants                                                                                 | Defined by     |
-|-----------------|----------------------------------------------------------------------------------------|----------------|
-| `PublicCanRead` | the `read` access kind to any caller, including unauthenticated ones; no write access | [[PWS-AUTHZ]] |
 
 </section>
 
