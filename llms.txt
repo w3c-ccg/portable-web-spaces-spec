@@ -13,6 +13,8 @@ This is an experimental W3C CCG draft (v0.3), undergoing regular revisions. It i
 - [Authorization Profile, rendered](https://w3c-ccg.github.io/portable-web-spaces-spec/authz-profile/): The same profile as static HTML.
 - [Encrypted Collections, full text (Markdown source)](https://w3c-ccg.github.io/portable-web-spaces-spec/ec/spec.md): The client-side profile for end-to-end encrypted Collections -- the encryption descriptor and key-epoch roster, the Encrypted Data Vault envelope, chunked resources, the blinded index, recipient management, and the resource log profile. Read this to write or read an encrypted Collection.
 - [Encrypted Collections, rendered](https://w3c-ccg.github.io/portable-web-spaces-spec/ec/): The same profile as static HTML.
+- [Replication, full text (Markdown source)](https://w3c-ccg.github.io/portable-web-spaces-spec/replication/spec.md): The pull-only replication profile -- the replica registration record and its checks, the pull loop over the changes feed, the per-kind apply rules under the origin write stamp, replicated controller logs, and the bounded fetch of a replica server's DID. Read this to run or register a replica.
+- [Replication, rendered](https://w3c-ccg.github.io/portable-web-spaces-spec/replication/): The same profile as static HTML.
 
 ## Optional
 

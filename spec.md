@@ -123,6 +123,16 @@ This subsection is non-normative.
     entry carries its own `checkpoint`. A server rejects a retired object
     checkpoint, and the replica restarts its pull from the beginning (see
     [[[#query-profile-changes]]]).
+* **v0.6** (November 2026 - now) -- Write stamps and replication between
+  servers. Breaking changes so far:
+  * Replication between servers is specified in a companion document,
+    [[PWS-REPLICATION]]. This document gains the `replicas` and `zcaps`
+    reserved segments (a Collection already named either is hidden under
+    the new layout), the `replicas` member and linkset relation of a Space,
+    the Collection Metadata object's `created` stamp, the `originId` and
+    `serverDid` members of the core [=version entry=], the
+    [=replica-refused=] error kind, and the registration-mapped resolution
+    of a replicated controller log (see [[[#self-hosted-histories]]]).
 
 No stored data moves across the v0.4-to-v0.5 path changes. The durable
 artifacts to audit are capabilities. A delegated capability whose
@@ -1096,6 +1106,16 @@ specification does not enumerate them.
   it does not recognize, and MUST treat an absent token (or an absent array)
   as "not supported". The tokens are those of the profile table in
   [[[#scope-and-conformance-profiles]]].
+* `originId` (optional) - The id of the store that mints this server's write
+  stamps: a string matching `[A-Za-z0-9_-]{1,64}`, set by the operator or
+  minted at first boot, and stable for the life of the store. It is not the
+  server's DID. It is carried here rather than under `instance` because a
+  replica registration gates on it (see [[PWS-REPLICATION]]).
+* `serverDid` (optional) - The server's own `did:webvh` identity, hosted on
+  the server itself at the path `space:server:id`. A controller delegates a
+  replication pull capability to this DID; see
+  [Server identity](https://w3c-ccg.github.io/portable-web-spaces-spec/replication/#server-identity)
+  in [[PWS-REPLICATION]]. A server with no server identity omits it.
 
 **An authorization profile's version entry.** A server lists every
 authorization profile it implements under the profile's own identifier (see
@@ -1105,6 +1125,15 @@ carries the signature algorithms and delegation-proof cryptosuites the server
 accepts; see the
 [Service Description Entry](https://w3c-ccg.github.io/portable-web-spaces-spec/authz-profile/#service-description-entry) section of
 [[PWS-AUTHZ]]. The example below shows one.
+
+**A companion specification's version entry.** A server lists every
+companion specification it implements under that specification's own
+identifier, and the companion defines its entry's members. The entries of
+[[PWS-EC]] (under `https://w3id.org/pws/encrypted-collections`) and
+[[PWS-REPLICATION]] (under `https://w3id.org/pws/replication`) are defined
+in those documents. For [[PWS-REPLICATION]] the entry's presence is the
+claim: a server that lists it serves the replica registration sub-resource
+and runs the pull loop, and there is no feature token for it.
 
 ### Instance Disclosure {#instance-disclosure}
 
@@ -1574,6 +1603,13 @@ Space properties automatically added by the server:
   reader learns it without a second request. It is read-only: a server MUST
   ignore a `backends` supplied in a request body. A server without pluggable
   backends (see [[[#backends]]]) omits it.
+* `replicas` (optional) - An array of `{ fromSpace, toSpace, role }` objects,
+  one per replica registration stored on this Space (see
+  [[PWS-REPLICATION]]). It lists the registrations stored on this Space
+  alone: a Space that is the source of another server's pull stores none and
+  serves an empty array. It is read-only: a server MUST ignore a `replicas`
+  supplied in a request body. A server that does not implement
+  [[PWS-REPLICATION]] omits it.
 
 A server that records `createdBy` on every Resource, Collection, and Space
 created under a capability invocation MUST advertise the `created-by` token in
@@ -1592,7 +1628,7 @@ beyond a wallet's agent-connection inbox, depends on attribution.
 
 The Space Metadata object therefore splits in two. Its user-writable members
 are `type` and `name`. Its server-derived members are `createdBy`, `url`,
-`linkset`, and `backends`. `controller` is neither: the creating invocation
+`linkset`, `backends`, and `replicas`. `controller` is neither: the creating invocation
 sets it and only the controller rewrites it. That split is the rule an import
 honours: restoring an archived Space Metadata object writes `type` and `name`,
 leaves the server-derived members to the server, and does not touch
@@ -2177,6 +2213,12 @@ ignore any of them supplied in a request body.
 
 * `createdAt` (optional) - The [[RFC3339]] `date-time` at which the Collection
   was created.
+* `created` - The write stamp of the write that created the Collection under
+  its current generation: a nested object `{ updatedAt, updatedAtCounter,
+  originId }` with the members of a write stamp, kept unchanged for the life
+  of that generation. A create over a tombstone records a new one, and an
+  import records the importing write's stamp. It is what orders two lives of
+  one Collection id under replication (see [[PWS-REPLICATION]]).
 * `updatedAt` (optional) - The [[RFC3339]] `date-time` at which this Metadata
   object was last modified.
 * `createdBy` (optional) - The [=did=] of the party whose capability invocation
@@ -2220,6 +2262,11 @@ Example Metadata object of a plaintext Collection (JSON representation):
   "type": ["Collection"],
   "name": "Verifiable Credentials Collection",
   "createdAt": "2026-06-10T09:12:00Z",
+  "created": {
+    "updatedAt": "2026-06-10T09:12:00.000Z",
+    "updatedAtCounter": 0,
+    "originId": "example-store-1"
+  },
   "updatedAt": "2026-06-12T13:25:00Z",
   "createdBy": "did:key:z6MkpBMbMaRSv5nsgifRAwEKvHHoiKDMhiAHShTFNmkJNdVW",
   "generator": {
@@ -3729,6 +3776,10 @@ resources and extension points:
   (`https://w3id.org/pws#quotas`) -
   A link to the `/space/{space_id}/quotas` per-backend storage [=quota=] report
   (see [[[#quotas]]]).
+* <dfn data-lt="replicas relation" id="replicas-rel"><code>replicas</code> relation</dfn>
+  (`https://w3id.org/pws#replicas`) - A link to the
+  `/space/{space_id}/replicas` replica registration listing, on a server
+  that implements [[PWS-REPLICATION]].
 * `service` relation ([[RFC5023]]) - A link to the [=service description=]
   (see [[[#discovering-the-service-description]]]).
 * `/space/{space_id}/query` - Reserved for cross-space query operations.
@@ -4321,6 +4372,16 @@ whenever the history the document was resolved from may have changed, so
 that a write to a self-hosted history (such as one adding or removing a key)
 is reflected by the next verification that resolves that DID.
 
+A server that implements [[PWS-REPLICATION]] also resolves, from its own
+storage, a verified-log DID whose history is hosted on another server but
+copied to this one under a replica registration. The DID resolves when
+exactly one local registration names the history's Space as its source and
+selects the history's Collection. The copy is read from that registration's
+local Space, and is verified, cached, and advanced under the same rules as a
+self-hosted history. See
+[Replicated controller logs](https://w3c-ccg.github.io/portable-web-spaces-spec/replication/#replicated-controller-logs)
+in [[PWS-REPLICATION]].
+
 ### `did:key` controller profile {#did-key-controller-profile}
 
 The mandatory floor. A conformant server MUST accept a
@@ -4415,6 +4476,8 @@ collections `id`s MUST NOT collide with the corresponding reserved segments.
 | `/space/{space_id}/linkset`     | `linkset`        | Links to auxiliary resources           |
 | `/space/{space_id}/query`       | `query`          | Reserved for cross-collection queries  |
 | `/space/{space_id}/quotas`      | `quotas`         | Reserved for per-backend quota report  |
+| `/space/{space_id}/replicas`    | `replicas`       | Replica registrations; owned by [[PWS-REPLICATION]], which defines the registration sub-resource under this segment. The segment stays reserved on every server whether or not it implements [[PWS-REPLICATION]] |
+| `/space/{space_id}/zcaps`       | `zcaps`          | Reserved for capability revocation. The segment is reserved on every server. The endpoint is not yet specified |
 
 If a client attempts to create a collection with an `id` that collides with a
 reserved segment list above, the server MUST return a 409 Conflict error.
@@ -5315,6 +5378,7 @@ profile [[PWS-AUTHZ]] lists which it emits when.
 | `https://w3id.org/pws#quota-exceeded`                | <dfn id="quota-exceeded">quota-exceeded</dfn>                               | 507            | A write was rejected because the target backend's storage quota is exhausted. See [[[#quotas]]].                                                                                                                                                                                                                                                                                                                 |
 | `https://w3id.org/pws#payload-too-large`             | <dfn id="payload-too-large">payload-too-large</dfn>                         | 413            | An upload exceeds the target backend's `maxUploadBytes` constraint (see [[[#quotas]]]). Note that unlike [=quota-exceeded=], this rejection is per-request: smaller uploads may still succeed.                                                                                                                                                                                                                   |
 | `https://w3id.org/pws#unsupported-operation`         | <dfn id="unsupported-operation">unsupported-operation</dfn>                 | 501            | An optional operation that this server or the target backend does not support (for example, a per-collection quota report on a backend without per-collection accounting).                                                                                                                                                                                                                                       |
+| `https://w3id.org/pws#replica-refused`               | <dfn id="replica-refused">replica-refused</dfn>                             | 409            | A replica registration, a replacement of its pull capability, the removal of a registration, or a Space `controller` change was refused over the state of the source or of this server. The cause is in `detail`. The [Refusals](https://w3c-ccg.github.io/portable-web-spaces-spec/replication/#refusals) section of [[PWS-REPLICATION]] lists the causes. Body-shape faults are [=invalid-request-body=] instead. Defined by [[PWS-REPLICATION]]. |
 | `https://w3id.org/pws#invalid-import`                | <dfn id="invalid-import">invalid-import</dfn>                               | 400            | An uploaded archive is not a valid PWS space export. The import operation itself is reserved and not yet specified (see [[[#reserved-path-segment-registry]]]); this kind is registered ahead of it so implementations converge on one error shape.                                                                                                                                                              |
 | `https://w3id.org/pws#storage-error`                 | <dfn id="storage-error">storage-error</dfn>                                 | 500            | An underlying storage operation failed.                                                                                                                                                                                                                                                                                                                                                                          |
 | `https://w3id.org/pws#internal-error`                | <dfn id="internal-error">internal-error</dfn>                               | 500            | An unexpected server-side fault with no more specific kind.                                                                                                                                                                                                                                                                                                                                                      |
