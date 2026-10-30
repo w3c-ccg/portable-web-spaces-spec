@@ -251,8 +251,9 @@ Space, through the linkset feature-detection mechanism (from [[RFC9264]]; see
 [[[#linksets]]]).
 
 **Normative status.** Section back-placement does not imply informative status.
-Everything from [[[#introduction]]] through [[[#quotas]]] is normative, as are the
-appendices [[[#pagination]]], [[[#space-controller-did-method-registry]]],
+Everything from [[[#introduction]]] through [[[#space-archive-format]]] is
+normative, as are the appendices [[[#pagination]]],
+[[[#space-controller-did-method-registry]]],
 [[[#policy-type-registry]]], [[[#reserved-path-segment-registry]]],
 [[[#encryption-scheme-registry]]], and [[[#error-type-registry]]] (each of which
 also carries an inline "This appendix is normative." banner). The remaining
@@ -392,28 +393,14 @@ pre-configured and controlled by the server.
 * `GET /space/{space_id}/meta` -- [[[#read-space-operation]]]
 * `PUT /space/{space_id}/meta` -- [[[#update-or-create-by-id-space-operation]]]
 * `DELETE /space/{space_id}/` -- [[[#delete-space-operation]]]
-* `POST /space/{space_id}/export` -- **Reserved / not yet specified.** Export
-  (download) a Space's contents (all collections and resources). When
-  specified, an exported archive carries the exporting server's Service
-  Description (see [[[#service-description]]]) verbatim, as a top-level
-  `service.json` beside the archive's manifest, so that an importer can read
-  the specification version and the feature set the contents were written
-  under before it writes anything.
-* `POST /space/{space_id}/import` -- **Reserved / not yet specified.** Import
-  (upload) a previously exported Space archive (the operation the registered
-  [=invalid-import=] error kind anticipates). When specified, import MUST
-  restore an archived Space Metadata object's user-writable members (see
-  [[[#space-metadata-data-model]]]) only under an invocation of the Space's
-  root capability, MUST skip them under a delegated chain, and MUST report
-  which of the two it did. It MUST NOT restore server-derived members.
+* `POST /space/{space_id}/export` -- [[[#export-operation]]]
+* `POST /space/{space_id}/import` -- [[[#import-operation]]]
 
-<div class="note">
-The per-Space archive manifest written by the reference implementation names
-section anchors of this document as the specification of its entries, so those
-anchors are stable identifiers: [[[#spaces]]],
-[[[#collection-metadata-data-model]]], [[[#resource-data-model]]],
+Both operations exchange a [=Space archive=], the format defined in
+[[[#space-archive-format]]]. The archive's manifest points each entry at the
+section of this document that defines it. Those section anchors are therefore
+permanent: [[[#spaces]]], [[[#collection-metadata-data-model]]],
 [[[#resource-metadata-data-model]]], and [[[#access-control-policies]]].
-</div>
 
 **Advanced Resource Endpoints:**
 
@@ -1120,6 +1107,14 @@ behavior on it: what a client acts on is `specs`. Its members:
   deployment under a license that requires offering source to network users
   can satisfy that requirement here.
 * `homepage` (optional) - The absolute URL of the software's project page.
+* `exportSigningMethod` (optional) - The verification method this instance
+  signs [=Space archives=] with (see [[[#archive-provenance]]]), as the
+  `did:key` of its key. Absent when the instance has no signing identity.
+* `serverDid` (optional) - The instance's own DID, of a method registered
+  in [[[#archive-signer-did-methods]]], whose document lists the
+  `exportSigningMethod` key under `assertionMethod`. Present only once that
+  document resolves and lists the key that way, so an instance MAY carry
+  `exportSigningMethod` without `serverDid`.
 
 The members follow the `software` object of NodeInfo, the most widely
 deployed vocabulary for this purpose, with `source` in place of its
@@ -1596,7 +1591,7 @@ are `type` and `name`. Its server-derived members are `createdBy`, `url`,
 sets it and only the controller rewrites it. That split is the rule an import
 honours: restoring an archived Space Metadata object writes `type` and `name`,
 leaves the server-derived members to the server, and does not touch
-`controller` (see [[[#space-level-reserved-endpoints]]]).
+`controller` (see [[[#import-operation]]]).
 
 A server that supports conditional writes (see [[[#conditional-requests]]])
 also keeps a server-managed version validator for each Space Metadata object:
@@ -1830,6 +1825,270 @@ Errors (see [[[#error-type-registry]]] for canonical examples):
   [[[#error-handling]]], so that an unauthorized caller cannot probe for
   existence.
 * [=invalid-id=] (400) -- the supplied Space `id` is not URL-safe.
+
+### Export Space operation {#export-operation}
+
+<div class="note">
+This operation is an OPTIONAL extension, advertised by the `export` feature
+token (see [[[#scope-and-conformance-profiles]]]). A server that implements
+it also implements [[[#import-operation]]].
+</div>
+
+* Returns the Space's contents as a [=Space archive=], the tar archive
+  defined in [[[#space-archive-format]]]. That section lists what the
+  archive holds.
+* Requires appropriate authorization: a root capability invoked directly by
+  the Space's [=controller=], or a delegated capability that allows the
+  `POST` action and whose `invocationTarget` covers the Space. The export
+  endpoint inherits the Space's prefix authority (see
+  [[[#space-level-reserved-endpoints]]]). A [=policy=] grants nothing here.
+  A Space whose contents are publicly readable is still exported only under
+  a capability, since an export discloses the whole Space at once.
+* The request has no body and no query parameters. The operation is carried
+  over `POST` because it is capability-invoked. It is nonetheless safe. It
+  writes nothing.
+* The response is `200 OK` with `Content-Type: application/x-tar` and the
+  archive as the body. A server SHOULD stream the archive rather than hold
+  it in memory, and a server MUST produce byte-identical archives for an
+  unchanged Space (see [[[#archive-container]]]).
+* The archive carries the exporting server's [=service description=]
+  verbatim as the root entry `service.json`. An importer can therefore read
+  the specification version and the feature set the contents were written
+  under before it writes anything.
+* A server that holds an export signing identity (see
+  [[[#archive-provenance]]]) includes a provenance statement for every
+  exported object and the signing DID's log, so an importer can verify the
+  archive's contents offline.
+* An export is a copy of the Space's data, not of the server's
+  configuration. It leaves out backend registrations and their connection
+  material, replica registrations, changes-feed positions and other
+  server-local state, quota reports, and linksets. Policy tombstones are not
+  carried. A deleted policy is absent from the archive.
+* An export need not be a point-in-time snapshot. A write that lands while
+  the export runs MAY appear in some entries and not in others, and the
+  provenance statement of such an object MAY then fail to match it (see
+  [[[#archive-provenance]]]).
+
+#### (HTTP API) POST `/space/{space_id}/export`
+
+Example request (no request body):
+
+```http
+POST /space/81246131-69a4-45ab-9bff-9c946b59cf2e/export HTTP/1.1
+Host: example.com
+Authorization: ...
+```
+
+Example success response:
+
+```http
+HTTP/1.1 200 OK
+Content-Type: application/x-tar
+
+<tar archive; see the Space Archive Format section>
+```
+
+Errors (see [[[#error-type-registry]]] for canonical examples):
+
+* [=not-found=] (404) -- the Space does not exist, or the caller has missing
+  or insufficient authorization.
+* [=unsupported-operation=] (501) -- the server does not implement export.
+
+### Import Space operation {#import-operation}
+
+<div class="note">
+This operation is an OPTIONAL extension, advertised with the `export`
+feature token together with [[[#export-operation]]].
+</div>
+
+* Merges a [=Space archive=] (see [[[#space-archive-format]]]) into an
+  existing Space. The target Space MUST already exist. Import does not
+  create a Space. A client restoring a Space under its original `id` creates it
+  first (see [[[#update-or-create-by-id-space-operation]]]) and then
+  imports.
+* Requires appropriate authorization: a root capability invoked directly by
+  the Space's [=controller=], or a delegated capability that allows the
+  `POST` action and whose `invocationTarget` covers the Space. The import
+  endpoint inherits the Space's prefix authority (see
+  [[[#space-level-reserved-endpoints]]]). A [=policy=] grants nothing here.
+  Which of the two was invoked matters in one place only, the Space
+  Metadata entry below.
+* The request body is the archive bytes, with
+  `Content-Type: application/x-tar`. The body is covered by the
+  authorization profile's body-integrity mechanism (the request `Digest` of
+  [[PWS-AUTHZ]]) as every write body is. A server MAY accept the archive
+  under another `Content-Type`; a missing one is a
+  [=missing-content-type=] error.
+* Import is a merge that adds what the destination lacks and skips what it
+  holds. It does not overwrite. Importing the same archive twice therefore
+  changes nothing the second time, and a restore interrupted part-way
+  converges when it is run again.
+* A server MUST check the archive before it writes anything: the manifest,
+  the entry layout, the archived Space `type`, each body against the
+  backend's upload constraint, and the total against the Space's remaining
+  quota. A rejection on those checks leaves the Space untouched. The write
+  phase itself need not be atomic. A failure after writes began leaves them
+  in place, and the response is the error. A retry skips what landed.
+
+The merge rules, per kind of entry:
+
+* **Space Metadata.** This is the `.space.meta.<space_id>.json` entry.
+  Under an invocation of the Space's root capability, the server restores
+  the object's user-writable members (see [[[#space-metadata-data-model]]]),
+  currently just `name`, with the same write Update Space makes. Under a
+  delegated chain the server MUST skip them, and it MUST report which of
+  the two it did in `spaceMetadata` below. `type` is immutable once a Space
+  exists, so the server compares it rather than applying it. An archive
+  whose `type` differs from the destination's is refused with
+  [=invalid-import=] before anything is written. The server MUST NOT
+  restore the server-derived members or `controller`. The server treats an
+  entry that is not a JSON object as absent.
+* **Space policy.** This is the `.space.policy.json` entry. The server
+  writes it only when the destination holds no policy record for the
+  Space. A deleted policy counts as a record, so an import does not undo a
+  delete.
+* **Collection.** The server skips a Collection the destination already
+  holds. Its Metadata object, policy, and governing history log stay as
+  they are. Archived Resources of that Collection that the destination
+  lacks are still imported into it. A Collection the destination holds
+  only as a tombstone counts as absent. The server recreates the archived
+  Collection with its archived generation and a write stamp above the
+  tombstone's. The server creates a Collection the destination lacks from
+  the archived Metadata object, with its policy, its log, and its
+  Resources. The server writes an archived Collection tombstone only when
+  the destination holds no record under that id, live or deleted. An
+  archived Collection whose `backend` names a backend the destination Space
+  lacks is an [=unsupported-backend=] error.
+* **Resource.** The server creates a Resource the destination holds no
+  record of, live or deleted, from its archived content and its archived
+  Metadata object. The user-writable members and `createdAt` are kept.
+  `contentType` and `size` are those of the content written, and the write
+  stamp is the importing server's. The server writes the archived policy
+  with it. The server skips a Resource the destination holds, live or as a
+  tombstone, together with its policy. The server writes an archived
+  Resource tombstone only when absent. The server checks content written
+  into an encrypted Collection against the Collection's declared scheme as
+  it would a live write (see [[[#encryption-scheme-registry]]]). An
+  archive that carries more than one representation file for the same
+  Resource id still yields one Resource.
+* **Chunks.** The server writes each archived chunk when the destination
+  holds no chunk at that index under that Resource, and skips it otherwise.
+  The server skips the chunks of a Resource the destination lacks, or holds
+  as a tombstone.
+* **`createdBy`.** The server keeps the archived `createdBy` of an object
+  only when the object's provenance statement verifies (see
+  [[[#archive-provenance]]]). Otherwise it imports the object without it.
+* **Validators.** The server imports no archived `ETag` or version as a
+  validator. It mints its own, as it does for any write (see
+  [[[#conditional-requests]]]).
+* **Revocation records.** These are the `.revocations/` entries. The server
+  installs them after the data, one at a time, each only when its
+  capability chain verifies under the destination Space and the importing
+  invocation could itself have submitted that revocation. The server skips
+  any other record without an error. The record format and both checks are
+  the authorization profile's ([[PWS-AUTHZ]]).
+
+#### (HTTP API) POST `/space/{space_id}/import`
+
+Example request:
+
+```http
+POST /space/81246131-69a4-45ab-9bff-9c946b59cf2e/import HTTP/1.1
+Host: example.com
+Content-Type: application/x-tar
+Digest: mh=uEiB...
+Authorization: ...
+
+<tar archive>
+```
+
+Example success response. The body is the import report:
+
+```http
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+{
+  "collectionsCreated": 2,
+  "collectionsSkipped": 0,
+  "resourcesCreated": 14,
+  "resourcesSkipped": 1,
+  "policiesCreated": 1,
+  "policiesSkipped": 0,
+  "spaceMetadata": "restored",
+  "provenance": {
+    "verified": 17,
+    "unattested": 0,
+    "proofInvalid": 0,
+    "contentMismatch": 0,
+    "unknownSigner": 0
+  }
+}
+```
+
+Every member of the import report is REQUIRED:
+
+* `collectionsCreated`, `collectionsSkipped` - Live Collections created,
+  and live Collections the destination already held. Collection tombstones
+  are not counted.
+* `resourcesCreated`, `resourcesSkipped` - Resources created, and Resources
+  the destination already held (live or deleted). An archived Resource
+  tombstone counts in whichever applies. Chunks are not counted.
+* `policiesCreated`, `policiesSkipped` - Policies written, and policies
+  left because the destination kept its own record. A Resource's policy
+  counts with the Resource: created with a created Resource, skipped with a
+  skipped one.
+* `spaceMetadata` - One of `restored` (the user-writable members were
+  applied under a root invocation), `skipped` (the archive carried the
+  entry but the invocation was a delegated chain, or the Space had no
+  stored object to apply it over), or `absent` (the archive carried no
+  Space Metadata entry).
+* `provenance` - An object of five non-negative integers, one per
+  verification outcome of [[[#archive-provenance]]]: `verified`,
+  `unattested`, `proofInvalid`, `contentMismatch`, `unknownSigner`. Every
+  attested kind of object is counted once, whether or not the destination
+  already held it. Revocation records are not counted.
+
+Errors (see [[[#error-type-registry]]] for canonical examples):
+
+* [=not-found=] (404) -- the Space does not exist, or the caller has missing
+  or insufficient authorization.
+* [=invalid-import=] (400) -- the body is not a [=Space archive=] a server
+  can import. Among the causes:
+  * the bytes are not a tar;
+  * `manifest.yml` is missing, is not YAML, or carries an `ubc-version`
+    other than `"0.1"`;
+  * the manifest has no `space` entry, or the archive has no
+    `space/{space_id}/` directory;
+  * an entry has no place in the layout of [[[#space-archive-format]]];
+  * a Collection Metadata entry is not a JSON object, names a different
+    Collection, or fails the shape rules of
+    [[[#collection-metadata-data-model]]];
+  * a Collection carries both a governing history log and an `encryption`
+    or `plaintext` member;
+  * a history log fails its stored shape;
+  * a policy entry lacks a string `type`, or is a policy tombstone;
+  * a Collection id appears both as a tombstone and as a directory, or a
+    tombstone sits inside a Collection directory;
+  * the archived Space `type` differs from the destination's;
+  * a revocation record is not JSON or lacks `capability.id`.
+
+  The `detail` of each `errors` entry SHOULD name the offending entry.
+* [=missing-content-type=] (400) -- the request carries no `Content-Type`.
+* [=invalid-authorization-header=] (400) -- the `Digest` header is missing
+  or does not match the body.
+* [=invalid-id=] (400), [=reserved-id=] (409) -- an id read from the archive
+  is not URL-safe or collides with a reserved segment.
+* [=unsupported-backend=] (409) -- an archived Collection selects a backend
+  the destination Space does not have.
+* [=payload-too-large=] (413) -- an archived body exceeds the target
+  backend's `maxUploadBytes` constraint.
+* [=encryption-scheme-mismatch=] (422) -- an archived body under an
+  encrypted Collection does not conform to the Collection's scheme.
+* [=quota-exceeded=] (507) -- the archive does not fit the Space's remaining
+  quota, or exceeds the server's Collection count limit.
+* [=unsupported-operation=] (501) -- the server does not implement import.
+* [=storage-error=] (500) -- an underlying storage operation failed.
 
 ### List All Collections operation {#list-all-collections-operation}
 
@@ -4147,6 +4406,360 @@ Errors (see [[[#error-type-registry]]] for canonical examples):
 * [=unsupported-operation=] (501) -- the Collection's backend does not support
   per-collection quota accounting.
 
+## Space Archive Format {#space-archive-format}
+
+<div class="note">
+This section defines the archive written by the OPTIONAL
+[[[#export-operation]]] and read by the [[[#import-operation]]]. A server
+that implements neither operation can skip this section (see
+[[[#scope-and-conformance-profiles]]]).
+</div>
+
+A <dfn data-lt="space archive|space archives">Space archive</dfn> is a tar
+archive holding one Space: its Metadata object and policy, its Collections
+and their Resources, the tombstones of deleted Collections and Resources, the
+revocation records of the authorization profile, and, when the exporting
+server has a signing identity, a provenance statement for every object. The
+archive is self-sufficient. A reader needs no request to the exporting server
+to interpret it. It carries the exporting server's service description, which
+tells a reader which specification version and features the contents were
+written under.
+
+The archive is a `manifest.yml` first, and a tree of files the manifest
+describes. The section anchors of this document that the manifest names are
+permanent identifiers: [[[#spaces]]], [[[#collection-metadata-data-model]]],
+[[[#resource-metadata-data-model]]], and [[[#access-control-policies]]],
+together with the anchors of this section.
+
+<div class="ednote">
+This layout was inspired by the "Unified Backup Container" of
+[FEP-6fcd](https://codeberg.org/fediverse/fep/src/branch/main/fep/6fcd/fep-6fcd.md),
+an unofficial draft in the Fediverse Enhancement Proposals community
+repository. The manifest's `ubc-version` member is kept from that draft.
+This document, not the FEP, defines the format.
+</div>
+
+### Container {#archive-container}
+
+* The archive is a tar archive (POSIX ustar or pax), uncompressed. Transfer
+  encodings are the transport's concern.
+* A writer sets the modification time of every entry header to a fixed
+  value, the Unix epoch (`1970-01-01T00:00:00Z`), rather than the time of
+  packing. The timestamp carries no meaning a reader relies on. Together
+  with a fixed entry order, this makes two exports of an unchanged Space
+  byte-identical, so a backup can be compared or deduplicated without
+  being unpacked.
+* Directories are present as entries of their own (`space/`,
+  `space/{space_id}/`, each Collection directory, each chunk directory, and
+  `.revocations/`), and a directory's entry precedes its children.
+* All entries of one chunk directory (see [[[#archive-chunk-directories]]])
+  MUST be contiguous: the directory entry, its chunk files and its sidecars,
+  with nothing else between them. A reader MAY treat a Resource whose chunk
+  directory is split as unreadable. The position of a chunk directory
+  relative to its Resource's representation file is not constrained.
+* Beyond the root entries below, the entry order within a directory is not
+  constrained. A writer SHOULD use a deterministic order (the reference
+  implementation sorts by name) to keep re-exports byte-identical.
+
+### Root entries {#archive-root-entries}
+
+The archive begins with these entries, in this order:
+
+1. `manifest.yml` -- REQUIRED, and always the first entry. See
+   [[[#archive-manifest]]].
+2. `service.json` -- OPTIONAL, recommended. The exporting server's [=service description=]
+   verbatim, byte-identical to its [[[#read-service-description-operation]]]
+   response. It describes the exporter, not the Space, and is not listed in
+   the manifest. An importer reads it for information; it MUST NOT be
+   required for import.
+3. `provenance.jsonl` -- OPTIONAL. One provenance statement per line; see
+   [[[#archive-provenance]]].
+4. `did.jsonl` -- OPTIONAL. The signing DID's resolution material, as the
+   signer's method profile defines it (see
+   [[[#archive-signer-did-methods]]]).
+5. `space/` -- the directory entry.
+6. `space/{space_id}/` -- the Space directory entry, named by the exported
+   Space's `id`.
+
+A root file placed after `space/`, or out of this order, is not recognized as
+that root file. A reader treats it as an unknown entry. Only a regular file
+entry counts; a symbolic or hard link does not.
+
+### The Space directory {#archive-space-directory}
+
+Everything under `space/{space_id}/` describes the Space. The Space `id` and
+each Collection `id` appear in directory names as they are, since both are
+URL-safe by [[[#identifiers]]]. Each entry is one of:
+
+| Entry | Name | Contents |
+|---|---|---|
+| Space Metadata | `.space.meta.{space_id}.json` | The Space Metadata object as stored (see [[[#space-metadata-data-model]]]), including its server-derived `backends` listing, its write stamp, and its `_generation` (see below). The `{space_id}` in the name lets a reader check the entry against its directory. |
+| Space policy | `.space.policy.json` | The Space's [=policy=] document, as [[[#access-control-policies]]] defines it. Absent when the Space has none. |
+| Collection | `{collection_id}/` | A live Collection; see [[[#archive-collection-directory]]]. |
+| Collection tombstone | `.collection.meta.{collection_id}.json` | A deleted Collection, with no `{collection_id}/` directory beside it. The body is exactly `deleted: true`, the deleting write's stamp, and `_generation`. |
+| Revocation records | `.revocations/{record}.json` | One flat file per revocation record of the authorization profile ([[PWS-AUTHZ]]). The record format and the file naming are the profile's. The directory is absent when the Space has none. |
+
+A Collection id MUST NOT appear both as a tombstone file and as a directory;
+a reader MUST refuse such an archive. A Collection directory whose name is a
+reserved segment of [[[#space-level-reserved-endpoints]]], or is
+`.revocations`, MUST NOT be written.
+
+**Metadata files and `_generation`.** A Space or Collection Metadata file
+holds the stored object whole: the members its Read operation returns, except
+members that are local to the exporting server, plus the server-managed write
+stamp of the object's last write (`updatedAt`, `updatedAtCounter`,
+`originId`) and the object's generation under the reserved member
+`_generation`. The generation is the component of the object's validator that
+identifies its lineage. Carrying it lets the lineage survive a round trip
+through an archive. A reader that wants the object itself strips
+`_generation`. A Resource's
+generation travels in its Metadata sidecar under `generation`, where the live
+object carries it. Members beginning with `_` are reserved to this format.
+
+<div class="ednote">
+The write-stamp members and the generation belong to the origin-stamped
+write identity text, which is still being written. Until that text lands,
+this section names them as the archive carries them.
+</div>
+
+### The Collection directory {#archive-collection-directory}
+
+Everything under `space/{space_id}/{collection_id}/` describes one live
+Collection. Each entry is one of:
+
+| Entry | Name | Contents |
+|---|---|---|
+| Collection Metadata | `.collection.meta.{collection_id}.json` | The Collection Metadata object as stored (see [[[#collection-metadata-data-model]]]), with its write stamp and `_generation`. REQUIRED in every Collection directory. |
+| Collection policy | `.collection.policy.json` | The Collection's [=policy=] document. Absent when the Collection has none. |
+| Governing history log | `.collectionlog.{collection_id}.json` | The stored log record of a governed Collection (see [[[#collection-governing-history-log]]]): a JSON object whose `body` is the log's JSON Lines text, beside the record's write stamp and `generation`. Absent when the Collection is not governed. |
+| Resource representation | `r.{enc_resource_id}.{enc_content_type}.{ext}` | The Resource's content bytes, exactly as a `GET` of the Resource returns them (see [[[#resource-data-model]]]). |
+| Resource Metadata | `.meta.{resource_id}.json` | The Resource's Metadata object as stored (see [[[#resource-metadata-data-model]]]): its server-managed members, `custom`, `epoch`, its write stamp and `generation`. A Resource tombstone is this entry with `deleted: true`, the deleting write's stamp, `generation` and the last `contentType`, and no representation file. |
+| Resource policy | `.r.{resource_id}.policy.json` | The Resource's [=policy=] document. Absent when the Resource has none. |
+| Chunk directory | `.chunks.{enc_resource_id}/` | The chunks of a chunked Resource; see [[[#archive-chunk-directories]]]. |
+
+Any other entry is unknown to this format. A reader MUST NOT fail on one; it
+MAY ignore it. No directory other than a chunk directory may sit inside a
+Collection directory.
+
+**Encoded segments.** The segments written `{enc_...}` are
+percent-encoded: every character outside the unreserved set of [[RFC3986]]
+(`ALPHA`, `DIGIT`, `-`, `_`, `~`) and outside `!*'()` is encoded as
+`%XX`, and `.` is encoded as `%2E` as well. The three literal dots of a
+representation name are then its only separators. A reader decodes a segment
+with ordinary percent-decoding. A segment that does not decode names no
+Resource; the entry is unknown.
+
+**The representation name.** `{enc_resource_id}` is the Resource `id`,
+encoded. `{enc_content_type}` is the Resource's `contentType` (see
+[[[#resource-metadata-data-model]]]), encoded, so `application/json` is
+written `application%2Fjson`. `{ext}` is a conventional file extension for
+that media type, for the benefit of someone unpacking the archive by hand;
+`blob` when the writer knows none. A reader MUST take the content type from
+the encoded segment and MUST NOT infer it from the extension. For example, the
+JSON Resource `note.1` is `r.note%2E1.application%2Fjson.json`, and its
+Metadata sidecar is `.meta.note.1.json`. The sidecar and policy names carry
+the Resource `id` unencoded, between a fixed prefix and a fixed suffix, so a
+Resource whose id ends in `.policy` is still unambiguous. `.r.` plus
+`.policy.json` names a policy, and `.meta.` plus `.json` names a sidecar.
+
+A JSON Resource and a Blob (see [[[#blob-data-model]]]) are written the same
+way. They differ only in the encoded content type.
+
+### Chunk directories {#archive-chunk-directories}
+
+A Resource stored as chunks (the chunk endpoints of [[PWS-EC]] under the
+reserved `chunks` segment of [[[#resource-level-reserved-endpoints]]])
+carries them in the directory `.chunks.{enc_resource_id}/` of its Collection
+directory. The directory holds, per stored chunk:
+
+* `r.{index}.{enc_content_type}.{ext}` -- the chunk's bytes, named as a
+  representation whose id is the chunk `index`.
+* `.meta.{index}.json` -- the chunk's metadata: its write stamp and
+  `generation`, and `createdAt` where the exporting server keeps one.
+
+`{index}` is the chunk's non-negative integer index in canonical decimal
+form, matching `0|[1-9][0-9]*`, at most `2^31 - 1`, and not
+percent-encoded. There is exactly one archive name for each chunk. A reader
+MUST ignore a chunk file whose index segment is not canonical. `01` therefore
+cannot alias chunk `1`.
+
+This grammar is the whole description of a chunk. Its `index` and
+`contentType` are in the file name. Its `generation` and stamp are in the
+sidecar. A server whose storage is not file-shaped emits these entries from
+whatever it stores and reads them back the same way. No other layout is
+implied. Chunk bytes are carried verbatim and are not checked against the
+Collection's encryption scheme on import. The Resource's own representation
+file is present beside the chunk directory whenever the Resource has
+content of its own (for a chunked Resource under [[PWS-EC]], its chunk
+manifest document).
+
+### The manifest {#archive-manifest}
+
+`manifest.yml` is a YAML document with two members:
+
+* `ubc-version` -- the string `"0.1"`.
+* `contents` -- a description of the archive tree. It is a mapping or
+  sequence whose items are bare file names, or single-key objects whose key
+  is the entry name and whose value carries an optional `url` naming the
+  specification of the entry and, for a directory, a `contents` of its own.
+
+The manifest is descriptive. It is derived from the same tree the archive
+packs, so it cannot disagree with the entries. A reader classifies entries by
+their paths (the sections above) and uses the manifest for what the paths do
+not say. A reader MUST refuse an archive whose first entry is not
+`manifest.yml`, whose manifest is not a YAML mapping with an `ubc-version`, or
+whose `contents.space.contents` names zero Spaces or more than one. An
+importer MUST refuse an `ubc-version` other than `"0.1"`.
+
+The root `contents` is a mapping with these members, in this order:
+
+* `manifest.yml`, whose `url` is this document's [[[#archive-manifest]]]
+  section.
+* `provenance.jsonl` and `did.jsonl`, each as `{}`, when the archive
+  carries them.
+* `space`, whose `url` is this document's [[[#spaces]]] section and whose
+  `contents` maps the one Space `id` to its entry.
+
+The Space's `contents` is a sequence. The entries whose shape this document
+defines carry the URL of the defining section: a Collection Metadata file
+([[[#collection-metadata-data-model]]]), a policy file
+([[[#access-control-policies]]]), and a Resource Metadata sidecar
+([[[#resource-metadata-data-model]]]). Every other entry is a bare name. A
+Resource representation is user content with no shape of this document's,
+so it is listed bare. A live
+Collection is an object with `contents` and no `url`. A Collection tombstone
+is an object with the Collection Metadata `url` and `deleted: true`. Chunk
+files are listed in their Collection's `contents` as the bare paths
+`.chunks.{enc_resource_id}/{file}`. `service.json` is not listed.
+
+```yaml
+ubc-version: "0.1"
+contents:
+  manifest.yml:
+    url: https://w3id.org/pws#archive-manifest
+  provenance.jsonl: {}
+  did.jsonl: {}
+  space:
+    url: https://w3id.org/pws#spaces
+    contents:
+      81246131-69a4-45ab-9bff-9c946b59cf2e:
+        url: https://w3id.org/pws#spaces
+        contents:
+          - .revocations:
+              contents:
+                - urn%3Auuid%3Afixture-revocation.json
+          - .space.meta.81246131-69a4-45ab-9bff-9c946b59cf2e.json
+          - .collection.meta.drafts.json:
+              url: https://w3id.org/pws#collection-metadata-data-model
+              deleted: true
+          - notes:
+              contents:
+                - .collection.meta.notes.json:
+                    url: https://w3id.org/pws#collection-metadata-data-model
+                - .collectionlog.notes.json
+                - .meta.note.1.json:
+                    url: https://w3id.org/pws#resource-metadata-data-model
+                - r.note%2E1.application%2Fjson.json
+```
+
+A `url` is this specification's identifier (`https://w3id.org/pws`, see
+[[[#service-description]]]) with the defining section's anchor as its
+fragment, not the rendered document's location. The `url` values are
+permanent wire text. A `url` written into an archive is not rewritten when
+this document moves or a section is renamed; the anchors named above are
+kept for that reason.
+
+### Archive provenance {#archive-provenance}
+
+A server MAY sign what it exports. Whoever imports the archive, on this
+server or another, can then tell that the objects came from that server
+unchanged. The signer is the exporting [=instance=], under a DID of its own.
+
+**The signing identity.** The instance signs under a DID of a method
+registered in [[[#archive-signer-did-methods]]]. The DID document lists the
+signing key under `assertionMethod`. It MAY also list the key under
+`capabilityInvocation`, and under no other relationship. What this section
+leaves open, the method's signer profile settles: the key type, the proof
+cryptosuite, the contents of `did.jsonl`, and the form of `didVersionId`.
+The service description's `instance` member advertises the key as
+`exportSigningMethod` and the DID as `serverDid` (see
+[[[#instance-disclosure]]]). An instance without such an identity exports no
+provenance. The archive then carries neither `provenance.jsonl` nor
+`did.jsonl`.
+
+**Resolution material.** The root entry `did.jsonl` (see
+[[[#archive-root-entries]]]) carries what a reader needs to resolve the
+signing DID without contacting the instance. The signer profile defines its
+contents. A reader resolves the DID from it at the version a statement
+names, and so verifies against the document that was current at signing
+time.
+
+**`provenance.jsonl`.** One statement per attested object, one JSON object
+per line, in the order the objects appear in the manifest. The attested
+objects are the Space Metadata object, each live Collection Metadata object,
+and each Resource that has a representation. Tombstones and revocation
+records are not attested. A statement has these members:
+
+* `id` -- the object's absolute URL on the exporting server: the Space's or
+  Collection's `meta` URL, or the Resource URL.
+* `type` -- the string `StorageAttestation`.
+* `createdBy`, `createdAt`, `updatedAt`, `updatedAtCounter`, `originId` --
+  copied from the archived object. A member the object lacks is omitted.
+* `meta` -- for a Resource whose Metadata object has been written, that
+  object's own stamp and generation, as `updatedAt`, `updatedAtCounter`,
+  `originId`, and `generation`.
+* `digest` -- for a Resource, the `Digest` header value of [[PWS-AUTHZ]]
+  (`mh=` followed by the base64url multihash of the SHA-256) over the
+  archived representation bytes. For a chunked Resource, the same form over
+  the JSON Canonicalization Scheme serialization of the array of its chunk
+  digests, in index order. The chunk bytes, not the chunk manifest, are then
+  what is attested.
+* `didVersionId` -- the version of the signing DID's document that lists
+  the signing key, in the form the signer profile defines. A verifier
+  resolves the DID at that version, so a later key rotation does not
+  invalidate an older archive.
+* `proof` -- one Data Integrity proof with the cryptosuite the signer
+  profile names, `proofPurpose` `assertionMethod`, and `verificationMethod`
+  the key's id under the signing DID. The proof carries no `created`. The
+  statement carries no JSON-LD context. It is signed as the plain JSON
+  object.
+
+**Verification.** An importer that finds `provenance.jsonl` verifies each
+statement independently, against the object the archive carries at the same
+place, and records one of five outcomes per attested object:
+
+* `verified` -- all of the following hold:
+  * the signing DID's method is a registered signer method, and the DID
+    resolves from `did.jsonl` as that method's profile defines;
+  * the statement's `verificationMethod` belongs to that DID, resolved at
+    `didVersionId`, and is listed under `assertionMethod`;
+  * the proof verifies;
+  * every claimed member, including `digest`, equals what the archived
+    object carries.
+* `unattested` -- the archive carries no statement for the object, or no
+  `provenance.jsonl` at all.
+* `proofInvalid` -- the signer resolves but the proof does not verify.
+* `contentMismatch` -- the proof verifies but a claimed member or the
+  `digest` differs from the archived object.
+* `unknownSigner` -- the signing DID's method is not a registered signer
+  method, `did.jsonl` is absent or does not verify, the `verificationMethod`
+  belongs to a different DID, `didVersionId` names no version of the
+  document, or the key is listed under a relationship other than
+  `assertionMethod` and `capabilityInvocation`.
+
+An importer MAY further require that the signing DID be the identity the
+exporting host advertises as `serverDid`, and treat any other signer as
+`unknownSigner`.
+
+An object whose outcome is not `verified` is still imported, without its
+`createdBy`, since the attribution it carries is then no better than the
+archive's word. The counts are reported in the import report's `provenance`
+member (see
+[[[#import-operation]]]). A statement attests one object at a time. The set
+of objects is not signed, so a statement's absence is not detectable from
+the archive alone, and an importer MUST NOT read `unattested` as evidence of
+tampering.
+
 <section class="appendix">
 
 ## Pagination {#pagination}
@@ -4351,24 +4964,34 @@ log's first entry, the hash chain of entries is verified, pre-rotation
 commitments (`nextKeyHashes`) are enforced, and each entry's proof is
 verified against the update keys authorized by the entry before it.
 
-</section>
+### Archive signer DID methods {#archive-signer-did-methods}
 
-<section class="appendix normative">
+This registry also lists the DID methods an [=instance=] may sign
+[=Space archives=] under (see [[[#archive-provenance]]]). A signer method's
+profile names the key type and proof cryptosuite of a provenance statement,
+what the archive's `did.jsonl` root entry holds, how a reader resolves the
+DID from it, and the form of a statement's `didVersionId`. An importer
+treats a statement whose signer's method is not listed here as
+`unknownSigner`. Signing is OPTIONAL under every method.
 
-## Policy Type Registry {#policy-type-registry}
+| Method                                                   | Kind         | `did.jsonl` holds                | Profile                                    |
+|----------------------------------------------------------|--------------|----------------------------------|--------------------------------------------|
+| [`did:webvh`](https://identity.foundation/didwebvh/)     | verified log | the DID's history log            | [[[#did-webvh-archive-signer-profile]]]    |
 
-This appendix is normative.
+#### `did:webvh` archive signer profile {#did-webvh-archive-signer-profile}
 
-This registry lists the `type` values an access control [=policy=] may carry
-(see [[[#access-control-policies]]]) and the specification that defines each
-one. A [=server=] evaluates a policy by looking its `type` up here. A `type`
-not in this registry is unrecognized and grants nothing, per the fail-closed
-rule. Registering a type adds a row naming the specification that defines
-it; this specification defines no policy type itself.
+Signing key. An Ed25519 key, listed under `assertionMethod` in the DID
+document. The statement proof uses the cryptosuite `eddsa-jcs-2022`.
 
-| `type`          | Grants                                                                                 | Defined by     |
-|-----------------|----------------------------------------------------------------------------------------|----------------|
-| `PublicCanRead` | the `read` access kind to any caller, including unauthenticated ones; no write access | [[PWS-AUTHZ]] |
+Resolution material. The archive's `did.jsonl` is the DID's history log,
+verbatim as the instance serves it. A reader verifies the log as
+[[[#did-webvh-controller-profile]]] requires of a controller's log, then
+resolves the document at the entry a statement names. A log that does not
+verify counts as absent, and every statement under it is `unknownSigner`.
+
+`didVersionId`. The `versionId` of the log entry whose document lists the
+signing key. A value that names no entry of the log names no version of
+the document, and the statement is `unknownSigner`.
 
 </section>
 
@@ -4410,8 +5033,8 @@ collections `id`s MUST NOT collide with the corresponding reserved segments.
 | `/space/{space_id}/policy`      | `policy`         | Access control policy                  |
 | `/space/{space_id}/backends`    | `backends`       | Storage backends available             |
 | `/space/{space_id}/collections` | `collections`    | Retired in v0.5. Listing and creating collections moved to the Space URL (see [[[#list-all-collections-operation]]]); a server MAY answer this path with a `308 Permanent Redirect` to it. The segment stays reserved |
-| `/space/{space_id}/export`      | `export`         | Export (download) space contents       |
-| `/space/{space_id}/import`      | `import`         | Import (upload) a space export archive |
+| `/space/{space_id}/export`      | `export`         | Export the Space as a [=Space archive=]; see [[[#export-operation]]]. A capability covering the Space with `POST` reaches it |
+| `/space/{space_id}/import`      | `import`         | Import a [=Space archive=] into the Space; see [[[#import-operation]]]. A capability covering the Space with `POST` reaches it |
 | `/space/{space_id}/linkset`     | `linkset`        | Links to auxiliary resources           |
 | `/space/{space_id}/query`       | `query`          | Reserved for cross-collection queries  |
 | `/space/{space_id}/quotas`      | `quotas`         | Reserved for per-backend quota report  |
@@ -5315,7 +5938,7 @@ profile [[PWS-AUTHZ]] lists which it emits when.
 | `https://w3id.org/pws#quota-exceeded`                | <dfn id="quota-exceeded">quota-exceeded</dfn>                               | 507            | A write was rejected because the target backend's storage quota is exhausted. See [[[#quotas]]].                                                                                                                                                                                                                                                                                                                 |
 | `https://w3id.org/pws#payload-too-large`             | <dfn id="payload-too-large">payload-too-large</dfn>                         | 413            | An upload exceeds the target backend's `maxUploadBytes` constraint (see [[[#quotas]]]). Note that unlike [=quota-exceeded=], this rejection is per-request: smaller uploads may still succeed.                                                                                                                                                                                                                   |
 | `https://w3id.org/pws#unsupported-operation`         | <dfn id="unsupported-operation">unsupported-operation</dfn>                 | 501            | An optional operation that this server or the target backend does not support (for example, a per-collection quota report on a backend without per-collection accounting).                                                                                                                                                                                                                                       |
-| `https://w3id.org/pws#invalid-import`                | <dfn id="invalid-import">invalid-import</dfn>                               | 400            | An uploaded archive is not a valid PWS space export. The import operation itself is reserved and not yet specified (see [[[#reserved-path-segment-registry]]]); this kind is registered ahead of it so implementations converge on one error shape.                                                                                                                                                              |
+| `https://w3id.org/pws#invalid-import`                | <dfn id="invalid-import">invalid-import</dfn>                               | 400            | The body of an [[[#import-operation]]] request is not a [=Space archive=] the server can import: not a tar, a missing or unsupported manifest, an entry with no place in the layout of [[[#space-archive-format]]], a malformed Metadata, log, policy or revocation entry, or a Space `type` that differs from the destination's. Raised before anything is written.                                                                                                                                                              |
 | `https://w3id.org/pws#storage-error`                 | <dfn id="storage-error">storage-error</dfn>                                 | 500            | An underlying storage operation failed.                                                                                                                                                                                                                                                                                                                                                                          |
 | `https://w3id.org/pws#internal-error`                | <dfn id="internal-error">internal-error</dfn>                               | 500            | An unexpected server-side fault with no more specific kind.                                                                                                                                                                                                                                                                                                                                                      |
 
