@@ -152,6 +152,10 @@ This subsection is non-normative.
     `serverDid` members of the core [=version entry=], the
     [=replica-refused=] error kind, and the registration-mapped resolution
     of a replicated controller log (see [[[#self-hosted-histories]]]).
+  * The capability invocation on a `HEAD` request names the `GET` action, and
+    a server verifies it as a `GET` (see
+    [[[PWS-AUTHZ#capability-invocation]]]). `HEAD` is not an action and is not
+    an `allowedAction` value. A pull capability's `allowedAction` is `["GET"]`.
 
 No stored data moves across the v0.4-to-v0.5 path changes. The durable
 artifacts to audit are capabilities. A delegated capability whose
