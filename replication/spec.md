@@ -141,8 +141,8 @@ same Space, which is what makes the Space multi-primary.
   <dt><dfn data-lt="pull capabilities">pull capability</dfn></dt>
   <dd>A delegated capability [[PWS-AUTHZ]] whose chain roots in the
   [=source Space=]'s root capability, whose <code>controller</code> is the
-  [=replica server=]'s [=server DID=], and whose actions lie within
-  <code>GET</code> and <code>HEAD</code>. The replica server signs every
+  [=replica server=]'s [=server DID=], and whose one action is
+  <code>GET</code>. The replica server signs every
   request of the pull loop as an invocation of it
   ([[[#capability-checks]]]).</dd>
 
@@ -412,7 +412,7 @@ Example record, as served:
     "controller": "did:webvh:Qm...:replica.example:space:server:id",
     "parentCapability": "urn:zcap:root:https%3A%2F%2Fsource.example%2Fspace%2F81246131-69a4-45ab-9bff-9c946b59cf2e%2F",
     "invocationTarget": "https://source.example/space/81246131-69a4-45ab-9bff-9c946b59cf2e/",
-    "allowedAction": ["GET", "HEAD"],
+    "allowedAction": ["GET"],
     "expires": "2027-10-01T00:00:00Z",
     "proof": { "...": "..." }
   },
@@ -746,7 +746,8 @@ The `capability` member MUST satisfy all of the following:
   authorization profile defines both. Under a target that covers the Space
   URL alone, every `GET` beneath it is refused, and the registration fails at
   the first read.
-* Its `allowedAction` is present, non-empty, and within `{ GET, HEAD }`.
+* Its `allowedAction` is present and names `GET` alone. A `HEAD` request is
+  authorized as a `GET` under [[PWS-AUTHZ]], so `HEAD` is not listed.
 * Its `controller` is this server's server DID.
 * The source server admits it. The replica server confirms this by reading
   the source through it during these checks.
@@ -1163,7 +1164,7 @@ that is one of two kinds of key:
     [=replica pointer=] in the account's client-annex document;
   * its target is the account Space, or the client-annex auxiliary Space
     the account document names;
-  * its actions lie within `{ GET, HEAD }`;
+  * its one action is `GET`;
   * its parent is the Space's root.
 
 A [=replica pointer=] is a service entry in the client-annex document whose
@@ -1282,7 +1283,7 @@ sub-resource.
 
 ### Read authority is all a replica holds {#read-authority}
 
-The pull capability carries `GET` and `HEAD` alone, and the loop invokes
+The pull capability carries the `GET` action alone, and the loop invokes
 nothing else. A replica server holds no write authority on its source, and a
 compromised replica server can disclose what it has read but cannot alter
 the source. In the other direction, a source server can serve a replica

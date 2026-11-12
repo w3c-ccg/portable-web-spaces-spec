@@ -309,7 +309,12 @@ must permit. This profile uses the uppercase HTTP method names as its action
 vocabulary:
 
 * <dfn id="get-action">`GET`</dfn> -- read a Space, Collection, or Resource. A
-  `HEAD` request is authorized as a `GET`.
+  `HEAD` request is authorized as a `GET`. Its capability invocation MUST name
+  the `GET` action, and a server MUST verify it as a `GET` against the
+  request's [=target=]. A capability whose `allowedAction` permits `GET`
+  therefore permits `HEAD`. The signature still covers the request's own
+  method. `HEAD` is not an action of this profile and is not an
+  `allowedAction` value.
 * <dfn id="post-action">`POST`</dfn> -- create a child item in a container (add a
   Resource to a Collection, a Collection to a Space, or a Space to the Spaces
   Repository).
@@ -327,7 +332,7 @@ A request is authorized by a capability when all the following hold:
 
 1. the capability's `invocationTarget` matches the request's [=target=];
 2. the capability's `allowedAction` includes the request's [=action=] (the
-   HTTP method); and
+   HTTP method, with `HEAD` verified as `GET`); and
 3. the invocation is signed by a key the capability authorizes, carried as a
    valid HTTP Signature over the request (see
    [[[#performing-authorized-api-calls]]]), and that key is present in the
