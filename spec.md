@@ -93,7 +93,7 @@ This subsection is non-normative.
   * Delete Space, Update (or Create by Id) Space, Delete Collection, and
     Update (or Create by Id) Collection now require a root capability
     invoked directly by the Space's controller, with exactly two named
-    exceptions (see [[[#the-container-rule]]]). Delegated capabilities
+    exceptions (see [[[PWS-AUTHZ#the-container-rule]]]). Delegated capabilities
     previously authorized a Delete Collection carrying the `DELETE` action,
     and a Delete Space or Update Space carrying any zcap scoped to the
     Space; both are now refused outside the exceptions.
@@ -108,7 +108,8 @@ This subsection is non-normative.
   * The zCap authorization profile and the `PublicCanRead` policy type moved
     to a companion specification, [[PWS-AUTHZ]], with wire behavior
     unchanged. This document keeps the contract every authorization profile
-    meets (see [[[#authorization]]]) and gains a [[[#policy-type-registry]]].
+    meets (see [[[#authorization]]]). Policy types are listed in
+    [[[PWS-AUTHZ#policy-type-registry]]].
     The `signatureAlgorithms` and `zcapCryptosuites` members moved from this
     specification's [=version entry=] to the profile's own entry under
     `https://w3id.org/pws/authz-profile`, which a server now lists.
@@ -206,10 +207,10 @@ placeholders for those identifiers.
 
 **Normative lists live in the appendices.** Error `type` URIs are catalogued in
 [[[#error-type-registry]]], path segments this specification reserves in
-[[[#reserved-path-segment-registry]]], access control policy types in
-[[[#policy-type-registry]]], and client-side encryption schemes in
+[[[#reserved-path-segment-registry]]], and client-side encryption schemes in
 [[[#encryption-scheme-registry]]]. Those registries are normative: they, not the
-surrounding prose, are where an implementation looks such values up.
+surrounding prose, are where an implementation looks such values up. Access
+control policy types are listed in [[[PWS-AUTHZ#policy-type-registry]]].
 </div>
 
 ### Use Cases
@@ -270,7 +271,7 @@ Space, through the linkset feature-detection mechanism (from [[RFC9264]]; see
 Everything from [[[#introduction]]] through [[[#space-archive-format]]] is
 normative, as are the appendices [[[#pagination]]],
 [[[#space-controller-did-method-registry]]],
-[[[#policy-type-registry]]], [[[#reserved-path-segment-registry]]],
+[[[#reserved-path-segment-registry]]],
 [[[#encryption-scheme-registry]]], and [[[#error-type-registry]]] (each of which
 also carries an inline "This appendix is normative." banner). The remaining
 appendices -- [[[#goals-and-requirements]]] and [[[#iana-considerations]]] -- are
@@ -760,7 +761,7 @@ and [[[#collection-linkset]]]).
   who presents a valid capability.
 * **Fail-closed.** An absent policy, or a policy whose `type` an implementation
   does not recognize, grants nothing. The recognized types are those of
-  [[[#policy-type-registry]]].
+  [[[PWS-AUTHZ#policy-type-registry]]].
 * **Most-specific-wins inheritance.** The effective policy for a target is the
   one set at the most specific level that has a policy document: a Resource
   policy overrides a Collection policy, which overrides a Space policy.
@@ -773,7 +774,7 @@ and [[[#collection-linkset]]]).
 Policy `type` values are defined by policy profiles, in the same way that
 authorization is defined by an authorization profile. This specification does
 not fix the set. The registered types, each with the specification that
-defines it, are listed in [[[#policy-type-registry]]]. An implementation
+defines it, are listed in [[[PWS-AUTHZ#policy-type-registry]]]. An implementation
 recognizes a `type` by looking it up there, and a `type` not listed grants
 nothing. The baseline profile [[PWS-AUTHZ]] defines `PublicCanRead`, the
 first registered type.
@@ -1705,7 +1706,7 @@ creates the Space when none exists under that `id`. The client specifies the
 * Requires appropriate authorization. Updating an existing Space's Metadata
   object MUST be authorized by a root capability invoked directly by the
   Space's [=controller=]; a delegated capability never authorizes this
-  write, whatever its `allowedAction` (see [[[#the-container-rule]]]).
+  write, whatever its `allowedAction` (see [[[PWS-AUTHZ#the-container-rule]]]).
   Creating a Space at this URL follows the create-by-id rule below instead.
 * Allows the client to update the following fields:
   - `name`
@@ -1837,7 +1838,7 @@ Errors (see [[[#error-type-registry]]] for canonical examples):
   the space's [=controller=], or a delegated capability whose
   `invocationTarget` is exactly this Space's URL and whose `allowedAction`
   is exactly `['DELETE']` -- the Space-delete exception to the container
-  rule, see [[[#the-container-rule]]]
+  rule, see [[[PWS-AUTHZ#the-container-rule]]]
 * Deletes the space and all the data (collections and resources) contained
   in it
 * This operation is idempotent
@@ -2148,7 +2149,7 @@ Errors (see [[[#error-type-registry]]] for canonical examples):
   [[[#collection-metadata-data-model]]]). A server MAY additionally surface a
   `public` member on each item: a boolean indicating
   whether a `PublicCanRead` access control policy (see
-  [[[#policy-type-registry]]]) is attached to that Collection. It is surfaced
+  [[[PWS-AUTHZ#policy-type-registry]]]) is attached to that Collection. It is surfaced
   inline so that a listing consumer need not issue one policy probe per item to
   learn whether the Collection is publicly readable. A server that surfaces
   `public` MUST include it on *every* item in the listing, expressing `false`
@@ -2862,7 +2863,7 @@ with the list of [[[#space-level-reserved-endpoints]]].
   the Space's own canonical (trailing-slash) URL, rather than the
   Collection container URL, the Collection Metadata URL, or a Resource URL
   -- the Collection-metadata exception to the container rule, see
-  [[[#the-container-rule]]].
+  [[[PWS-AUTHZ#the-container-rule]]].
 
 Full replacement means that a writable member the request omits is cleared, so
 a client that wants to change one member reads the object, edits it, and writes
@@ -3140,7 +3141,7 @@ Errors (see [[[#error-type-registry]]] for canonical examples):
 
 * Requires appropriate authorization: a root capability invoked directly by
   the space's [=controller=]. A delegated capability never authorizes this
-  operation, whatever its `allowedAction` (see [[[#the-container-rule]]]).
+  operation, whatever its `allowedAction` (see [[[PWS-AUTHZ#the-container-rule]]]).
 
 * This operation is idempotent
 

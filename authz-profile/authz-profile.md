@@ -69,8 +69,6 @@ The following are defined by [[PWS]] and only cited here:
   and the rules for setting and changing a controller.
 * The `/policy` auxiliary resource, its discovery through the linkset, and
   the [policy evaluation contract](https://w3c-ccg.github.io/portable-web-spaces-spec/#access-control-policies).
-* The [Policy Type Registry](https://w3c-ccg.github.io/portable-web-spaces-spec/#policy-type-registry),
-  where the policy type this document defines is registered.
 * The error kinds this profile reports, in the
   [Error Type Registry](https://w3c-ccg.github.io/portable-web-spaces-spec/#error-type-registry);
   see [[[#errors]]].
@@ -401,6 +399,52 @@ chain against the recorded revocations). A future revision will specify the
 operation and reserve its path segments.
 </div>
 
+### The Container Rule {#the-container-rule}
+
+Target attenuation stops working for four operations: `DELETE
+/space/{space_id}/`, `PUT /space/{space_id}/meta` on a Space that already
+exists, `DELETE /space/{space_id}/{collection_id}/`, and `PUT
+/space/{space_id}/{collection_id}/meta`. A capability delegated at a
+container's `invocationTarget` -- the Space URL or the Collection URL --
+covers everything beneath it, including its data, so nothing about that
+target tells apart "delete this container" from "delete a Resource inside
+it". These four operations therefore MUST be authorized by a root
+capability invoked directly by the Space's [=controller=]. A delegated
+capability MUST NOT authorize any of them, with exactly two exceptions.
+
+1. **Delete Space.** A delegated capability MAY authorize `DELETE
+   /space/{space_id}/`, for a Space of any controller DID method, when the
+   invoked capability's `invocationTarget` is exactly that Space's URL and
+   its `allowedAction` is exactly `['DELETE']`. The shape is judged on the
+   invoked capability itself: a parent capability further up its
+   delegation chain MAY carry a broader `allowedAction` set, as long as the
+   invoked capability narrows it to exactly `['DELETE']` on exactly the
+   Space URL. Such a capability is not a data grant -- an `allowedAction`
+   of `['DELETE']` alone cannot be used to read or write anything beneath
+   the Space -- so it does not carry the hazard the rule otherwise guards
+   against.
+
+2. **Update (or Create by Id) Collection.** A delegated capability MAY
+   authorize `PUT /space/{space_id}/{collection_id}/meta` when the
+   invoked capability's `invocationTarget` is the Space's own canonical
+   (trailing-slash) URL, rather than the Collection container URL, the
+   Collection Metadata URL, or a Resource URL. A Space-level
+   grant is not a Collection-level data grant, so it does not reopen the
+   hazard either.
+
+Both exceptions are judged on the shape of the capability alone -- its
+`invocationTarget` and `allowedAction` -- independent of who signed it. A
+server MUST NOT treat a capability as satisfying either exception because
+of the verification relationship its signing key holds in a DID document
+(for example, membership in a `capabilityDelegation` set); only the
+capability's own shape, and the [=root capability=] its chain derives
+from, decide whether an exception applies.
+
+Creating a Collection (`POST /space/{space_id}/`) is unaffected by this
+rule: it remains an ordinary attenuated operation, and a delegated
+capability targeting the Space MAY authorize it, like any other create
+by `POST`.
+
 ## Service Description Entry {#service-description-entry}
 
 A server that implements this profile lists it in its service description
@@ -461,10 +505,9 @@ and the request's action is reduced to a `read` or `write` access kind. See
 its [Access Control Policies](https://w3c-ccg.github.io/portable-web-spaces-spec/#access-control-policies)
 section for the contract.
 
-Policy `type` values are defined by profiles and registered in the
-[Policy Type Registry](https://w3c-ccg.github.io/portable-web-spaces-spec/#policy-type-registry)
-of [[PWS]]. This profile defines one type. A server implementing this profile
-MUST evaluate it.
+Policy `type` values are defined by profiles and registered in
+[[[#policy-type-registry]]]. This profile defines one type. A server
+implementing this profile MUST evaluate it.
 
 ### `PublicCanRead` {#publiccanread}
 
@@ -479,6 +522,21 @@ still require a capability. Setting it on a Space makes the whole Space
 public-readable (subject to any more specific Collection or Resource policy);
 setting it on a single Resource exposes only that Resource.
 
+
+## Policy Type Registry {#policy-type-registry}
+
+This section is normative.
+
+This registry lists the `type` values an access control policy may carry
+(see [Access Control Policies](https://w3c-ccg.github.io/portable-web-spaces-spec/#access-control-policies)
+of [[PWS]]) and the specification that defines each one. A server evaluates a
+policy by looking its `type` up here. A `type` not in this registry is
+unrecognized and grants nothing, per the fail-closed rule. Registering a type
+adds a row naming the specification that defines it.
+
+| `type`          | Grants                                                                                 | Defined by            |
+|-----------------|----------------------------------------------------------------------------------------|-----------------------|
+| `PublicCanRead` | the `read` access kind to any caller, including unauthenticated ones; no write access | [[[#publiccanread]]] |
 
 ## Errors {#errors}
 
