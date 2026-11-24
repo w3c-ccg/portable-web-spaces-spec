@@ -1201,7 +1201,7 @@ authorization profile it implements under the profile's own identifier (see
 [[[#authorization-profiles]]]), and the profile defines its entry's members.
 The baseline profile's entry, under `https://w3id.org/pws/authz-profile`,
 carries the signature algorithms and delegation-proof cryptosuites the server
-accepts; see the
+accepts, and the feature tokens of the profile's optional sections; see the
 [Service Description Entry](https://w3c-ccg.github.io/portable-web-spaces-spec/authz-profile/#service-description-entry) section of
 [[PWS-AUTHZ]]. The example below shows one.
 
