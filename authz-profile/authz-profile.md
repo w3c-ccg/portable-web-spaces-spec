@@ -122,7 +122,9 @@ The fully expanded form appears once, in the worked example of
   <dd>The resource a request acts on, as the full request URL (scheme, host,
     port, and path), and the scope a capability authorizes. A capability's
     <code>invocationTarget</code> MUST match the request target for the
-    invocation to be valid, see [[[#capability-invocation]]].</dd>
+    invocation to be valid, see [[[#capability-invocation]]]. A capability
+    MAY instead name a <code>did:webvh</code> DID URL that a server
+    dereferences to that URL, see [[[#did-url-targets]]].</dd>
 </dl>
 
 ## Specification Dependencies at a Glance {#authorization-specification-dependencies-at-a-glance}
@@ -355,6 +357,9 @@ controller's DID document -- to perform any operation. This is the "root access"
 path. All other authorized access derives from a capability delegated, directly
 or transitively, from this root.
 
+A Space also has a root capability whose target is a DID URL, on a server that
+implements [[[#did-url-targets]]]. See [[[#did-url-root-capability]]].
+
 ### Delegation {#delegation}
 
 To grant another agent access, the [=controller=] (or any agent holding a
@@ -388,6 +393,10 @@ alone, without its Resources, target the `meta` URL instead; that grant also
 covers the governing history log beneath it (see the
 [Collection Governing History Log](https://w3c-ccg.github.io/portable-web-spaces-spec/#collection-governing-history-log)
 of [[PWS]]). The same holds one level up for a Space.
+
+A capability's `invocationTarget` MAY be a `did:webvh` DID URL in place of an
+https URL, so that the grant keeps working when the Space moves to another
+provider. [[[#did-url-delegation-chains]]] gives the rules for such a chain.
 
 <div class="ednote">
 **Revocation.** This profile does not yet define a revocation
@@ -445,6 +454,249 @@ rule: it remains an ordinary attenuated operation, and a delegated
 capability targeting the Space MAY authorize it, like any other create
 by `POST`.
 
+## DID URL Targets {#did-url-targets}
+
+This section is OPTIONAL. A server that implements it lists the
+`did-url-targets` token in its service description entry (see
+[[[#service-description-entry]]]).
+
+Every [=target=] in the sections above is an HTTPS URL on one provider. When a
+Space moves to another provider, each capability issued for it names a URL
+that no longer serves the Space, and the grants are lost. A `did:webvh` DID
+URL [[DID-WEBVH]] can stand in for the https URL. A capability names a target
+such as `did:webvh:{scid}:alice.example/photos/cat.jpg`. A `PathHandler`
+service in the DID document maps the path to the current https URL. The
+Space's owner moves the Space by changing that service's `serviceEndpoint`,
+and the grants keep working.
+
+The request is still an HTTPS request. The HTTP Signature covers the HTTPS
+request URL, and the request's [=target=] is that URL, as
+[[[#capability-invocation]]] defines. Only the capabilities in the chain name
+DID URLs. A server dereferences each DID URL to an HTTPS URL and decides on
+the result.
+
+### Dereferencing a DID URL {#dereferencing-a-did-url}
+
+A <dfn data-lt="DID URL targets">DID URL target</dfn> is an `invocationTarget`
+that is a `did:webvh` DID URL with a path. It MAY carry a query. This version
+of the profile defines the version parameters `versionId`, `versionNumber`
+and `versionTime` (see [[[#did-url-selectors]]]). A target that carries a
+fragment is refused.
+
+<div class="ednote">
+**Other query parameters.** This version of the profile gives no meaning to a
+query parameter on a DID URL target other than the three version parameters.
+A server MAY refuse a target that carries one, and the reference
+implementation does. A future revision is expected to define further
+parameters. The attenuation rule of [[[#did-url-selectors]]] already covers
+them, since it compares the whole query.
+</div>
+
+A server dereferences a DID URL target as the DID URL path handling of
+[[DID-WEBVH]] describes:
+
+1. Resolve the DID document. The version parameters select the version. A
+   target without them is read from the current document.
+2. Of the document's services whose `type` includes `PathHandler`, select the
+   one whose `path` is the longest complete match from the start of the DID
+   URL path. A complete match is equal to the DID URL path, or is a prefix of
+   it that ends at a `/` boundary.
+3. Remove the matched `path` from the DID URL path and append the rest to the
+   service's `serviceEndpoint`.
+
+The result is the <dfn data-lt="dereferenced URLs">dereferenced URL</dfn>. It
+carries no query and no fragment. It MUST be in canonical form. A server
+refuses a dereferenced URL that a URL parser would rewrite, such as one with
+a dot segment, a percent-encoded dot segment or a backslash. A target that
+does not resolve, or whose path no `PathHandler` matches, is refused.
+
+For example, this service maps the root path of a DID to a Space:
+
+```json
+{
+  "id": "#root",
+  "type": "PathHandler",
+  "path": "/",
+  "serviceEndpoint": "https://example.com/space/81246131-69a4-45ab-9bff-9c946b59cf2e/"
+}
+```
+
+Under it, the DID URL target `did:webvh:{scid}:alice.example/messages/`
+dereferences to
+`https://example.com/space/81246131-69a4-45ab-9bff-9c946b59cf2e/messages/`.
+
+Every refusal in this section is reported as the masked `not-found` (see
+[[[#errors]]]), except where [[[#did-url-denial-causes]]] says otherwise.
+
+### DID URL Root Capability {#did-url-root-capability}
+
+A Space has a root capability in DID URL form besides the HTTPS form of
+[[[#root-capability]]]. Its id is `urn:zcap:root:` followed by the
+percent-encoded DID URL:
+
+```json
+{
+  "@context": "https://w3id.org/zcap/v1",
+  "id": "urn:zcap:root:did%3Awebvh%3A{scid}%3Aalice.example%2F",
+  "invocationTarget": "did:webvh:{scid}:alice.example/",
+  "controller": "did:key:z6MkpBMbMaRSv5nsgifRAwEKvHHoiKDMhiAHShTFNmkJNdVW"
+}
+```
+
+The following rules apply to it.
+
+* The DID URL MUST end in `/`. A Space has one root id per `PathHandler` path
+  that maps to it.
+* The DID URL MUST NOT carry a query or a fragment. A server
+  refuses a root that carries one. Nobody signs a root capability, so a server
+  always reads it from the current DID document, and a change to the mapping
+  moves every chain beneath it.
+* The DID URL MUST dereference to exactly the canonical (trailing-slash) URL
+  of the Space the request addresses. A root that dereferences to anything
+  else, such as another Space, another host or a Collection, is refused.
+* The root's `controller` is the Space's [=controller=], as for the https
+  form. The DID document does not supply it.
+
+Unlike the HTTPS form, only a Space has a root in DID URL form. A grant on a
+Collection or a Resource is a capability delegated from the Space's root, with
+a longer DID URL path.
+
+A server accepts a DID URL root on every operation on an existing Space. A
+request that creates a Space takes an https root, since no Space exists yet
+for the DID URL to dereference to (see [[[#authorizing-space-creation]]]).
+
+### DID URL Delegation Chains {#did-url-delegation-chains}
+
+A chain is in one form throughout. Every capability delegated beneath a DID
+URL root MUST carry a [=DID URL target=], and every capability beneath an
+HTTPS root MUST carry an HTTPS target. A server refuses a chain that mixes
+the two forms, whichever way it mixes them. A DID URL target and an HTTPS
+target never attenuate each other.
+
+Each capability's target MUST dereference to a URL at or beneath the
+[=dereferenced URL=] of its parent's target. This is the attenuation rule of
+[[[#delegation]]], applied to the dereferenced URLs. The root dereferences to
+the Space URL, so every capability in the chain stays inside the Space. A
+target that dereferences to another Space, another host or a path above its
+parent's URL is refused.
+
+A capability MAY dereference through a different `PathHandler` service than
+its parent did. A document can therefore alias a path, for example `/pics`
+mapped to the `photos` Collection URL of the same Space. One document can also
+serve several Spaces under different paths, and each Space then has its own
+root DID URL.
+
+A request is authorized by a chain in DID URL form when the conditions of
+[[[#capability-invocation]]] hold, with the invoked capability's
+[=dereferenced URL=] in place of its `invocationTarget`. The HTTPS request URL
+may extend the path of that URL, and may carry a query, as with an HTTPS
+target. The rules of [[[#the-container-rule]]] are also judged on the
+dereferenced URL of the invoked capability.
+
+### DID URL Selectors {#did-url-selectors}
+
+The query of a DID URL target is its selector. A version parameter in it
+chooses the version of the DID document that maps the path. That version's
+`PathHandler` services then map the path as usual. A selector is not required.
+
+A different document version may map the same path to a different Collection,
+so a delegate that could change the selector could reach data it was not
+granted. Attenuation between two DID URL targets therefore checks the path and
+the selector separately:
+
+1. Split each target at the first `?` or `#`. The part before it is the path
+   part, and the rest is the selector part. The selector part is the whole
+   query, whatever parameters it carries.
+2. The path part MUST equal the parent's, or extend it at a `/` boundary.
+3. The selector part MUST be byte-identical to the parent's.
+
+One exception applies to rule 3. The capability directly beneath the root MAY
+introduce a selector, since the root carries none. The Space's [=controller=]
+signs that capability, so the choice of document version is theirs. Every
+capability beneath it carries the selector unchanged.
+
+A query on the HTTPS request selects no DID document. A server does not hold
+it to the selectors of the capability.
+
+### Trust Model {#did-url-trust-model}
+
+The party that holds the DID's update keys controls the mapping and is
+trusted with everything granted under the Space's DID URL roots. The check of
+[[[#did-url-delegation-chains]]] bounds each capability by its parent's URL at
+the time of the request, and not at the time of issue. A change to the DID
+document can therefore do the following to a capability already issued:
+
+* break it by removing or repointing the service that maps its path;
+* widen it up to the whole Space its root dereferences to. Suppose a document
+  maps `/` to the Space, and a capability on `did:webvh:{scid}:alice.example/trash/`
+  allows `DELETE`. A new `PathHandler` that maps `/trash` to the Space URL
+  makes that capability dereference to the Space URL, where it satisfies the
+  Delete Space exception of [[[#the-container-rule]]];
+* move it to another Space of the same controller, by repointing the service
+  the root dereferences through.
+
+Two bounds hold whatever the document says. A capability never reaches
+outside the Space its root dereferences to. A server also gives the root the
+Space's own `controller`, and the chain MUST still be signed from that
+controller, so a DID document cannot create authority over a Space of another
+controller.
+
+The DID's update keys SHOULD be held by the Space's [=controller=]. A
+deployment where they are separate parties trusts the holder of the update
+keys with every grant made under a DID URL root.
+
+### Which DIDs a Target May Name {#which-dids-a-target-may-name}
+
+A [=DID URL target=] DID need not be the Space's `controller`, and need not be
+hosted by the server. Portability depends on this, since a Space's owner keeps
+the DID when the Space moves to a server that never hosted it.
+
+A server that holds a verified copy of the DID's log resolves the target from
+that copy. A server MAY fetch the log of a DID it does not host over the
+network. A server that does so:
+
+* SHOULD verify the request's signature and every delegation proof before it
+  fetches;
+* MAY cache the resolved document, and MAY limit how often it fetches a given
+  DID;
+* MAY refuse to fetch a DID or a host by operator policy.
+
+The cache lifetime and the fetch limits are the implementation's choice. They
+set how soon a server sees a move. A server that the Space moved away from MAY
+keep accepting grants under its cached document until that document expires.
+
+A refusal masks the status and the body of the response. It does not hide the
+fetch. The holder of a valid capability on a DID the server does not host can
+see a slower answer when the server fetches, and the host of the log sees the
+request.
+
+### Denial Causes {#did-url-denial-causes}
+
+A server that names the cause of a refusal to the holder of a capability, as
+`capability-revoked` or `capability-expired`, MUST NOT name it for a chain in
+DID URL form unless the chain's root dereferences to the Space the request
+addresses. Every other refusal of such a chain is the masked `not-found`.
+Without this rule, a capability for one Space presented at another would
+reveal its expiry when the two Spaces share a controller.
+
+### Revoking a Capability in DID URL Form {#did-url-revocation}
+
+A server that accepts revocation submissions (see the note in
+[[[#delegation]]]) accepts a chain in DID URL form when its root has the form
+of [[[#did-url-root-capability]]] and its delegation proofs verify back to
+the Space's [=controller=].
+
+* When a key of the Space's controller signs the submission, the server does
+  not dereference the root of the submitted chain. This holds whether the
+  submission's own invocation is rooted in the https root or the DID URL root.
+  A revocation, therefore, does not depend on the current mapping, and it stays
+  in force when the Space moves.
+* When any other party in the chain submits, the root of the submitted chain
+  MUST dereference to the Space the request addresses. Otherwise, a delegate
+  could submit its capability at any Space and learn which Spaces share a
+  controller.
+* The root capability of the revocation URL itself stays in https form.
+
 ## Service Description Entry {#service-description-entry}
 
 A server that implements this profile lists it in its service description
@@ -460,6 +712,20 @@ every entry has:
 * `zcapCryptosuites` (optional) - An array of the Data Integrity cryptosuite
   names the server accepts on capability delegation proofs, such as
   `eddsa-jcs-2022`.
+* `features` (optional) - An array of feature tokens naming the OPTIONAL
+  sections of this profile the server implements. The vocabulary is open and
+  additive. A client MUST ignore a token it does not recognize, and MUST treat
+  an absent token, or an absent array, as "not supported".
+
+This version of the profile defines one token:
+
+* <dfn data-lt="did-url-targets">`did-url-targets`</dfn> - The server accepts
+  a `did:webvh` DID URL as a capability's `invocationTarget` and as the target
+  of a Space's root capability, as [[[#did-url-targets]]] defines.
+
+A client MUST read the token before it issues a capability in DID URL form. A
+server without the token answers an invocation of such a capability with the
+masked `not-found`, which gives the holder no reason.
 
 The entry advertises no policy types. Listing this profile means the server
 evaluates every policy type this profile defines (see [[[#policies]]]).
@@ -476,7 +742,8 @@ evaluates every policy type this profile defines (see [[[#policies]]]).
         "version": "0.1",
         "url": "https://w3c-ccg.github.io/portable-web-spaces-spec/authz-profile/",
         "signatureAlgorithms": ["EdDSA"],
-        "zcapCryptosuites": ["eddsa-jcs-2022"]
+        "zcapCryptosuites": ["eddsa-jcs-2022"],
+        "features": ["did-url-targets"]
       }
     ]
   }

@@ -98,11 +98,11 @@ jobs:
 
       - name: Verify the snapshots contain the full spec text
         run: |
-          for phrase in "maximum privacy" "Authorization Profiles" "Policy Type Registry" "Error Type Registry"; do
+          for phrase in "maximum privacy" "Authorization Profiles" "Policy Types" "Error Type Registry"; do
             grep -qF "$phrase" _site/index.html \
               || { echo "::error::snapshot is missing expected text: $phrase"; exit 1; }
           done
-          for phrase in "Current-key-set rule" "Root Capability" "PublicCanRead" "Service Description Entry"; do
+          for phrase in "Current-key-set rule" "Root Capability" "PublicCanRead" "Policy Type Registry" "Service Description Entry"; do
             grep -qF "$phrase" _site/authz-profile/index.html \
               || { echo "::error::authz-profile snapshot is missing expected text: $phrase"; exit 1; }
           done
